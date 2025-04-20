@@ -54,6 +54,9 @@ public class ShockHandler {
 
         double intensity = mode == 0 ? m0 : m1;
 
+        if(intensity > PiShockConfig.PISHOCK_INTENSITY.get()) // Fix for a bug that sometimes gives us infinity
+            intensity = PiShockConfig.PISHOCK_INTENSITY.get();
+
         if (isAlive == 0)
             intensity = PiShockConfig.PISHOCK_INTENSITY.get();
 
@@ -65,7 +68,7 @@ public class ShockHandler {
             args.put("Username", PiShockConfig.PISHOCK_USERNAME.get());
             args.put("Code", PiShockConfig.PISHOCK_CODE.get());
             args.put("ApiKey", PiShockConfig.PISHOCK_APIKEY.get());
-            args.put("Op", 0);
+            args.put("Op", 1);
             args.put("Name", "MineCraft");
             args.put("Duration", 1);
             args.put("Intensity", Math.round(intensity));

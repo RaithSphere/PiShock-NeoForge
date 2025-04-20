@@ -1,8 +1,5 @@
 package net.raith.pishock;
 
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.raith.pishock.network.ShockHandler;
@@ -43,7 +40,7 @@ public class PiShock {
 
     @SubscribeEvent
     public void onDamage(LivingIncomingDamageEvent e) {
-        if (e.getEntity() instanceof Player player) {
+        if (!e.getEntity().level().isClientSide() && e.getEntity() instanceof Player player) {
 
             Player p = (Player) e.getEntity();
 
@@ -53,6 +50,9 @@ public class PiShock {
             float max = p.getMaxHealth();
             int isAlive = p.isAlive() ? 1 : 0;
 
+            // Log the damage for debugging
+            LOGGER.info("Player {} took {} damage. Current health: {}/{}", who, damage, now, max);
+
             CompletableFuture.runAsync(() -> {
                 ShockHandler.shock(damage, now, max, isAlive, player);
             });
@@ -60,13 +60,14 @@ public class PiShock {
     }
     @SubscribeEvent
     public void onPlayerDeath(LivingDeathEvent event) {
-        if (event.getEntity() instanceof Player player) {
+        if (!event.getEntity().level().isClientSide() && event.getEntity() instanceof Player player) {
 
             float damage = player.getHealth();
             float now = player.getHealth();
             float max = player.getMaxHealth();
             int isAlive = player.isAlive() ? 1 : 0;
 
+            LOGGER.info("Player {} has died. Damage taken: {}, Current health: {}/{}", player.getScoreboardName(), damage, now, max);
 
             CompletableFuture.runAsync(() -> {
                 ShockHandler.shock(damage, now, max, isAlive, player);
