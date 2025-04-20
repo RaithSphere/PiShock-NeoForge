@@ -1,7 +1,10 @@
 package net.raith.pishock;
 
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.raith.pishock.network.ShockHandler;
 import org.slf4j.Logger;
 
@@ -28,8 +31,7 @@ public class PiShock {
     public static final String MOD_ID = "pishock";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public PiShock(IEventBus modEventBus, ModContainer modContainer)
-    {
+    public PiShock(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
         NeoForge.EVENT_BUS.register(this);
         modContainer.registerConfig(ModConfig.Type.COMMON, PiShockConfig.SPEC);
@@ -39,6 +41,23 @@ public class PiShock {
 
     }
 
+    @SubscribeEvent
+    public void onDamage(LivingIncomingDamageEvent e) {
+        if (e.getEntity() instanceof Player player) {
+
+            Player p = (Player) e.getEntity();
+
+            float damage = e.getAmount();
+            String who = p.getScoreboardName();
+            float now = p.getHealth();
+            float max = p.getMaxHealth();
+            int isAlive = p.isAlive() ? 1 : 0;
+
+            CompletableFuture.runAsync(() -> {
+                ShockHandler.shock(damage, now, max, isAlive, player);
+            });
+        }
+    }
     @SubscribeEvent
     public void onPlayerDeath(LivingDeathEvent event) {
         if (event.getEntity() instanceof Player player) {

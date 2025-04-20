@@ -34,19 +34,16 @@ public class ShockHandler {
     // Shock Post to Server
     public static void shock(float damage, float now, float max, int isAlive, Player player)
     {
-
         PiShock.LOGGER.info("Damage:" +damage+ " Now:" +now+ " Max:" +max+ " IsAlive: " +isAlive);
         Component message = Component.translatable("Starting Shock"); // Customize your message
 
+        // If we are in cooldown do NOT SHOCK THE PLAYER HOWEVER... IF THEY DIE IGNORE IT
+        if(!isCooldownOk() && isAlive == 1)
+            return;
 
-        if(!isCooldownOk()) {// If we are in cooldown do NOT SHOCK THE PLAYER
-            message = Component.translatable("[PiShock] Cooldown in progress"); // Customize your message
-            player.sendSystemMessage(message);
+        if(Minecraft.getInstance().player.isDeadOrDying() && !PiShockConfig.PISHOCK_TRIGGER.get())
             return;
-        }
-        if(Minecraft.getInstance().player.isDeadOrDying() && !PiShockConfig.PISHOCK_TRIGGER.get()) {
-            return;
-        }
+
 
         millis = new Date();
         millis.setSeconds(millis.getSeconds() + PiShockConfig.PISHOCK_COOLDOWN.get());
