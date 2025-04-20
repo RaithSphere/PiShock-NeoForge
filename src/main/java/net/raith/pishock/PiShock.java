@@ -1,5 +1,8 @@
 package net.raith.pishock;
 
+import net.minecraft.network.chat.Component;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.raith.pishock.network.ShockHandler;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
@@ -14,36 +17,43 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.server.ServerStartingEvent;
+
+import net.minecraft.world.entity.player.Player;
+
+import java.util.concurrent.CompletableFuture;
 
 @Mod(PiShock.MOD_ID)
 public class PiShock {
 
     public static final String MOD_ID = "pishock";
-    private static final Logger LOGGER = LogUtils.getLogger();
+    public static final Logger LOGGER = LogUtils.getLogger();
 
     public PiShock(IEventBus modEventBus, ModContainer modContainer)
     {
         modEventBus.addListener(this::commonSetup);
         NeoForge.EVENT_BUS.register(this);
-        modEventBus.addListener(this::addCreative);
-        modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        modContainer.registerConfig(ModConfig.Type.COMMON, PiShockConfig.SPEC);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
 
     }
 
-    private void addCreative(BuildCreativeModeTabContentsEvent event) {
-
-    }
-
     @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
+    public void onPlayerDeath(LivingDeathEvent event) {
+        if (event.getEntity() instanceof Player player) {
 
+            float damage = player.getHealth();
+            float now = player.getHealth();
+            float max = player.getMaxHealth();
+            int isAlive = player.isAlive() ? 1 : 0;
+
+
+            CompletableFuture.runAsync(() -> {
+                ShockHandler.shock(damage, now, max, isAlive, player);
+            });
+        }
     }
-
     @EventBusSubscriber(modid = MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static class ClientModEvents {
         @SubscribeEvent
