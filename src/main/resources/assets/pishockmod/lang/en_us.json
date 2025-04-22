@@ -1,0 +1,9 @@
+{
+  "pishock.configuration.PiShock_Mode": "PiShock Mode",
+  "pishock.configuration.PiShock_Username": "Username",
+  "pishock.configuration.PiShock_Code": "Share Code",
+  "pishock.configuration.PiShock_TriggerOnDeath": "Trigger on Death",
+  "pishock.configuration.PiShock_API": "API Key",
+  "pishock.configuration.PiShock_Duration": "Shock Duration",
+  "pishock.configuration.PiShock_DeathIntensity": "Max Shock"
+}
