@@ -7,7 +7,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-@EventBusSubscriber(modid = PiShock.MOD_ID, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = PiShock.MOD_ID)
 public class PiShockConfig
 {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
