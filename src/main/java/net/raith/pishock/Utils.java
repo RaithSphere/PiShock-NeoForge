@@ -36,6 +36,6 @@ public class Utils {
      * @param message the message to send to the chat, must not be null
      */
     public static void sendToMinecraftChat(@Nonnull final String message) {
-        Minecraft.getInstance().gui.getChat().addMessage(Component.literal(message));
+        Minecraft.getInstance().gui.getChat().addRecentChat(String.valueOf(Component.literal(message)));
     }
 }
