@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
@@ -265,27 +264,6 @@ public class PiShockConfigScreen extends Screen {
     public void onClose() {
         if (this.minecraft != null) {
             this.minecraft.setScreen(this.parent);
-        }
-    }
-
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
-
-        int centerX = this.width / 2;
-        int left = centerX - 130;
-
-        guiGraphics.drawCenteredString(this.font, this.title, centerX, 12, 0xFFFFFF);
-
-        guiGraphics.drawString(this.font, "Username", left, 28, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, "API Key", left, 52, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, "User ID", left, 76, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, "Hub ID", left, 100, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, "Shocker ID", left, 124, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, "Log Identifier", left, 148, 0xA0A0A0, false);
-
-        if (!this.statusMessage.getString().isEmpty()) {
-            guiGraphics.drawCenteredString(this.font, this.statusMessage, centerX, this.height - 24, 0xFFD37F);
         }
     }
 

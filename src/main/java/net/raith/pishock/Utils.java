@@ -19,6 +19,6 @@ public class Utils {
         }
 
         // Ensure chat mutations always run on the main client thread.
-        minecraft.execute(() -> minecraft.gui.getChat().addMessage(Component.literal(message)));
+        minecraft.execute(() -> minecraft.gui.getChat().addClientSystemMessage(Component.literal(message)));
     }
 }
