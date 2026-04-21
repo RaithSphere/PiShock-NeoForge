@@ -33,6 +33,7 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.raith.pishock.client.PiShockClothConfigScreen;
+import net.raith.pishock.network.ShockCore;
 import net.raith.pishock.network.ShockHandler;
 import org.slf4j.Logger;
 import org.lwjgl.glfw.GLFW;
@@ -171,9 +172,7 @@ public class PiShock {
     }
 
     private static int computeIntensityFromDamageRatio(float damageRatio) {
-        int intensityLimit = PiShockConfig.PISHOCK_INTENSITY.get();
-        int rawShockPower = Math.round(Math.max(0.0F, damageRatio) * intensityLimit);
-        return Math.min(intensityLimit, Math.max(0, rawShockPower));
+        return ShockCore.computeIntensityFromDamageRatio(damageRatio, PiShockConfig.PISHOCK_INTENSITY.get());
     }
 
     private static void clearPendingDamage() {
