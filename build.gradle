@@ -26,6 +26,11 @@ base {
     archivesName = mod_id
 }
 
+tasks.withType(Jar).configureEach {
+    archiveFileName = "pishock-${project.mod_version}-${project.minecraft_version}-neoforge-${project.neo_version}.jar"
+}
+
+
 // Mojang ships Java 21 to end users starting in 1.20.5, so mods should target Java 21.
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
