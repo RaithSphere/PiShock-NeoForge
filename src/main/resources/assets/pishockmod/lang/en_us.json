@@ -1,9 +1,21 @@
 {
   "pishock.configuration.PiShock_Mode": "PiShock Mode",
+  "pishock.configuration.PiShock_Enabled": "Enabled",
   "pishock.configuration.PiShock_Username": "Username",
-  "pishock.configuration.PiShock_Code": "Share Code",
+  "pishock.configuration.PiShock_ShockerId": "Shocker ID",
+  "pishock.configuration.PiShock_HubId": "Hub ID",
+  "pishock.configuration.PiShock_UserId": "User ID",
+  "pishock.configuration.PiShock_LogIdentifier": "Log Identifier",
+  "pishock.configuration.PiShock_ShowSuccessConfirmation": "Show Success Confirmation",
   "pishock.configuration.PiShock_TriggerOnDeath": "Trigger on Death",
   "pishock.configuration.PiShock_API": "API Key",
-  "pishock.configuration.PiShock_Duration": "Shock Duration",
-  "pishock.configuration.PiShock_DeathIntensity": "Max Shock"
+  "pishock.configuration.PiShock_Duration": "Shock Duration (ms)",
+  "pishock.configuration.PiShock_CombineDamageEvents": "Combine Rapid Damage",
+  "pishock.configuration.PiShock_CombineWindowMs": "Combine Window (ms)",
+  "pishock.configuration.PiShock_QueueEnabled": "Queue Shocks",
+  "pishock.configuration.PiShock_QueueMaxSize": "Queue Max Size",
+  "pishock.configuration.PiShock_DeathIntensity": "Max Shock",
+  "key.category.pishock.controls": "PiShock",
+  "key.category.pishiock.controls": "PiShock",
+  "key.pishock.toggle_enabled": "Toggle PiShock"
 }
