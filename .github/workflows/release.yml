@@ -14,7 +14,7 @@ on:
         type: boolean
   push:
     tags:
-      - "*"
+      - "v*"
 
 jobs:
   release:
