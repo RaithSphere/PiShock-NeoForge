@@ -26,6 +26,11 @@ base {
     archivesName = mod_id
 }
 
+tasks.withType(Jar).configureEach {
+    archiveFileName = "pishock-${project.mod_version}-${project.minecraft_version}-neoforge-${project.neo_version}.jar"
+}
+
+
 // Mojang ships Java 21 to end users starting in 1.20.5, so mods should target Java 21.
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
@@ -114,6 +119,9 @@ configurations {
 
 dependencies {
     implementation "me.shedaniel.cloth:cloth-config-neoforge:21.11.153"
+    testImplementation "com.google.code.gson:gson:2.11.0"
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -136,6 +144,10 @@ dependencies {
     // For more info:
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

@@ -35,10 +35,6 @@ import java.util.function.Consumer;
 public class ShockHandler {
     private static final URI WS_API_URI_BASE = URI.create("wss://broker.pishock.com/v2");
     private static final String REST_API_BASE = "https://api.pishock.com";
-    private static final int HARD_MIN_DURATION_MS = 100;
-    private static final int HARD_MAX_DURATION_MS = 15000;
-    private static final int HARD_MIN_INTENSITY = 1;
-    private static final int HARD_MAX_INTENSITY = 100;
     private static final long FAILSAFE_MIN_DISPATCH_GAP_MS = 100L;
     private static final Gson GSON = new GsonBuilder()
             .setFieldNamingPolicy(FieldNamingPolicy.UPPER_CAMEL_CASE)
@@ -101,7 +97,13 @@ public class ShockHandler {
             return false;
         }
 
-        OperationLimits limits = enforceOperationLimits(Math.round(requestedIntensity), requestedDurationMs, respectConfiguredLimits);
+        ShockCore.OperationLimits limits = ShockCore.enforceOperationLimits(
+                Math.round(requestedIntensity),
+                requestedDurationMs,
+                respectConfiguredLimits,
+                PiShockConfig.PISHOCK_INTENSITY.get(),
+                PiShockConfig.PISHOCK_DURATION.get()
+        );
         int intensity = limits.intensity();
         int durationMs = limits.durationMs();
         debug("Resolved routing and clamped values: userId=" + discovery.userId + ", hubId=" + discovery.hubId
@@ -207,17 +209,17 @@ public class ShockHandler {
                     return null;
                 }
 
-                DeviceRouting routing = selectRouting(shockers, configuredHubId, configuredShockerId);
+                ShockCore.DeviceRouting routing = ShockCore.selectRouting(shockers, configuredHubId, configuredShockerId);
                 if (routing == null) {
                     Utils.unilog("Could not select a valid HubId/ShockerId from /Shockers.");
                     return null;
                 }
 
                 if (hubId == null) {
-                    hubId = routing.hubId;
+                    hubId = routing.hubId();
                 }
                 if (shockerId == null) {
-                    shockerId = routing.shockerId;
+                    shockerId = routing.shockerId();
                 }
             }
         } catch (Exception ex) {
@@ -233,50 +235,6 @@ public class ShockHandler {
         discoveryCache = new DiscoveryCache(username, apiKey, userId, hubId, shockerId);
         debug("Discovery resolved and cached.");
         return new DiscoveryResult(userId, hubId, shockerId);
-    }
-
-    private static DeviceRouting selectRouting(JsonArray shockers, Integer configuredHubId, Integer configuredShockerId) {
-        for (JsonElement element : shockers) {
-            if (!element.isJsonObject()) {
-                continue;
-            }
-            JsonObject candidate = element.getAsJsonObject();
-            Integer hubId = getInt(candidate, "HubId");
-            Integer shockerId = getInt(candidate, "ShockerId");
-            if (hubId == null || shockerId == null) {
-                continue;
-            }
-
-            if (configuredShockerId != null && configuredShockerId.intValue() != shockerId.intValue()) {
-                continue;
-            }
-
-            if (configuredHubId != null && configuredHubId.intValue() != hubId.intValue()) {
-                continue;
-            }
-
-            Utils.unilog("Selected routing HubId=" + hubId + " ShockerId=" + shockerId);
-            return new DeviceRouting(hubId, shockerId);
-        }
-
-        if (configuredShockerId != null || configuredHubId != null) {
-            return null;
-        }
-
-        for (JsonElement element : shockers) {
-            if (!element.isJsonObject()) {
-                continue;
-            }
-            JsonObject candidate = element.getAsJsonObject();
-            Integer hubId = getInt(candidate, "HubId");
-            Integer shockerId = getInt(candidate, "ShockerId");
-            if (hubId != null && shockerId != null) {
-                Utils.unilog("Selected first available routing HubId=" + hubId + " ShockerId=" + shockerId);
-                return new DeviceRouting(hubId, shockerId);
-            }
-        }
-
-        return null;
     }
 
     private static URI getApiUri(String username, String apiKey) {
@@ -533,24 +491,6 @@ public class ShockHandler {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
-    }
-
-    private static OperationLimits enforceOperationLimits(int requestedIntensity, int requestedDurationMs, boolean respectConfiguredLimits) {
-        int maxIntensity = HARD_MAX_INTENSITY;
-        int maxDuration = HARD_MAX_DURATION_MS;
-
-        if (respectConfiguredLimits) {
-            maxIntensity = clamp(PiShockConfig.PISHOCK_INTENSITY.get(), HARD_MIN_INTENSITY, HARD_MAX_INTENSITY);
-            maxDuration = clamp(PiShockConfig.PISHOCK_DURATION.get(), HARD_MIN_DURATION_MS, HARD_MAX_DURATION_MS);
-        }
-
-        int safeIntensity = clamp(requestedIntensity, HARD_MIN_INTENSITY, maxIntensity);
-        int safeDurationMs = clamp(requestedDurationMs, HARD_MIN_DURATION_MS, maxDuration);
-        return new OperationLimits(safeIntensity, safeDurationMs);
-    }
-
     private static boolean isDispatchGapTooSmall() {
         long now = System.currentTimeMillis();
         synchronized (ShockHandler.class) {
@@ -627,9 +567,9 @@ public class ShockHandler {
 
         if (brokerMessage != null && brokerMessage.toLowerCase().contains("publish successful")) {
             String originalCommand = getString(payload, "OriginalCommand");
-            AckDetails ackDetails = extractAckDetails(originalCommand);
+            ShockCore.AckDetails ackDetails = ShockCore.extractAckDetails(originalCommand, GSON);
             if (ackDetails != null) {
-                reportSuccessToChat("[PiShock] Shocked " + ackDetails.intensity + "% (" + formatDurationSeconds(ackDetails.durationMs) + "s)");
+                reportSuccessToChat("[PiShock] Shocked " + ackDetails.intensity() + "% (" + formatDurationSeconds(ackDetails.durationMs()) + "s)");
             } else {
                 reportSuccessToChat("[PiShock] Shock command acknowledged.");
             }
@@ -638,46 +578,6 @@ public class ShockHandler {
 
     private static String formatDurationSeconds(int durationMs) {
         return String.format(Locale.ROOT, "%.2f", Math.max(0, durationMs) / 1000.0);
-    }
-
-    private static AckDetails extractAckDetails(String originalCommand) {
-        if (originalCommand == null || originalCommand.isBlank()) {
-            return null;
-        }
-
-        try {
-            JsonElement parsed = GSON.fromJson(originalCommand, JsonElement.class);
-            if (parsed == null || !parsed.isJsonObject()) {
-                return null;
-            }
-
-            JsonObject commandObj = parsed.getAsJsonObject();
-            JsonElement publishCommandsElement = commandObj.get("PublishCommands");
-            if (publishCommandsElement == null || !publishCommandsElement.isJsonArray()) {
-                return null;
-            }
-
-            JsonArray publishCommands = publishCommandsElement.getAsJsonArray();
-            if (publishCommands.isEmpty() || !publishCommands.get(0).isJsonObject()) {
-                return null;
-            }
-
-            JsonObject firstPublish = publishCommands.get(0).getAsJsonObject();
-            JsonElement bodyElement = firstPublish.get("Body");
-            if (bodyElement == null || !bodyElement.isJsonObject()) {
-                return null;
-            }
-
-            JsonObject body = bodyElement.getAsJsonObject();
-            Integer intensity = getInt(body, "i");
-            Integer duration = getInt(body, "d");
-            if (intensity == null || duration == null) {
-                return null;
-            }
-            return new AckDetails(intensity, duration);
-        } catch (Exception ignored) {
-            return null;
-        }
     }
 
     private static void debug(String message) {
@@ -693,9 +593,6 @@ public class ShockHandler {
         return debugEnabled || PiShockConfig.PISHOCK_DEBUG.get();
     }
 
-    private record DeviceRouting(int hubId, int shockerId) {
-    }
-
     private record DiscoveryResult(int userId, int hubId, int shockerId) {
     }
 
@@ -703,12 +600,6 @@ public class ShockHandler {
         private boolean matches(String candidateUsername, String candidateApiKey) {
             return username.equals(candidateUsername) && apiKey.equals(candidateApiKey);
         }
-    }
-
-    private record OperationLimits(int intensity, int durationMs) {
-    }
-
-    private record AckDetails(int intensity, int durationMs) {
     }
 
     @SuppressWarnings("unused")
