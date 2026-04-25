@@ -282,9 +282,11 @@ configurations {
 }
 
 dependencies {
+    def jSerialCommDependency = "com.fazecast:jSerialComm:2.11.4"
     implementation "me.shedaniel.cloth:cloth-config-neoforge:21.11.153"
-    implementation "com.fazecast:jSerialComm:2.11.4"
-    jarJar "com.fazecast:jSerialComm:2.11.4"
+    implementation jSerialCommDependency
+    clientAdditionalRuntimeClasspath jSerialCommDependency
+    jarJar jSerialCommDependency
     testImplementation "com.google.code.gson:gson:2.11.0"
     testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
