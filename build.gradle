@@ -14,8 +14,100 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = mod_version
+def modPropertiesFile = file('gradle.properties')
+def modVersionPattern = ~/^(\d{2})\.(\d{1,2})\.(\d{1,2})\.(\d+)$/
+
+def computeNextModVersion = { String currentVersion ->
+    def today = java.time.LocalDate.now()
+    def todayPrefix = today.format(java.time.format.DateTimeFormatter.ofPattern('yy.MM.dd'))
+    def matcher = currentVersion =~ modVersionPattern
+
+    if (matcher.matches()) {
+        def currentPrefix = String.format('%s.%02d.%02d',
+                matcher[0][1],
+                matcher[0][2] as int,
+                matcher[0][3] as int)
+        if (currentPrefix == todayPrefix) {
+            return "${todayPrefix}.${(matcher[0][4] as int) + 1}"
+        }
+    }
+
+    return "${todayPrefix}.1"
+}
+
+def updateModVersionProperty = { String newVersion ->
+    def updatedLines = modPropertiesFile.readLines('UTF-8').collect { line ->
+        line.startsWith('mod_version=') ? "mod_version=${newVersion}" : line
+    }
+    modPropertiesFile.setText(updatedLines.join(System.lineSeparator()) + System.lineSeparator(), 'UTF-8')
+}
+
+def versionBumpTasks = [
+        'assemble',
+        'build',
+        'buildNewRelease',
+        'jar',
+        'publish',
+        'publishAllPublicationsToMavenRepository',
+        'publishMavenJavaPublicationToMavenRepository'
+]
+def shouldAutoBumpVersion = (
+        !project.hasProperty('skipVersionBump')
+                && gradle.startParameter.taskNames.any { requestedTask ->
+            versionBumpTasks.any { bumpTask -> requestedTask == bumpTask || requestedTask.endsWith(":${bumpTask}") }
+        }
+)
+
+def activeModVersion = mod_version
+if (shouldAutoBumpVersion) {
+    activeModVersion = computeNextModVersion(mod_version)
+    if (activeModVersion != mod_version) {
+        updateModVersionProperty(activeModVersion)
+        logger.lifecycle("Updated mod_version from ${mod_version} to ${activeModVersion}")
+    }
+}
+
+version = activeModVersion
 group = mod_group_id
+
+tasks.register('bumpModVersion') {
+    group = 'Raith'
+    description = 'Updates mod_version in gradle.properties using the YY.MM.DD.X pattern.'
+
+    doLast {
+        def currentVersion = modPropertiesFile.readLines('UTF-8')
+                .find { it.startsWith('mod_version=') }
+                ?.substring('mod_version='.length())
+        if (currentVersion == null) {
+            throw new GradleException('Could not find mod_version in gradle.properties')
+        }
+
+        def newVersion = computeNextModVersion(currentVersion)
+        updateModVersionProperty(newVersion)
+        logger.lifecycle("Updated mod_version from ${currentVersion} to ${newVersion}")
+    }
+}
+
+tasks.register('buildNewRelease') {
+    group = 'Raith'
+    description = 'Builds a release jar and copies it into E:\\PiShock Mod Builds\\<minecraft version>.'
+    dependsOn tasks.named('build')
+
+    doLast {
+        def releaseDirectory = file("E:/PiShock Mod Builds/${project.minecraft_version}")
+        copy {
+            from tasks.named('jar').get().archiveFile
+            into releaseDirectory
+        }
+        logger.lifecycle("Copied release jar to ${releaseDirectory}")
+    }
+}
+
+tasks.register('testClient') {
+    group = 'Raith'
+    description = 'Launches the NeoForge client run configuration.'
+    dependsOn 'runClient'
+}
 
 repositories {
     mavenLocal()
@@ -27,7 +119,7 @@ base {
 }
 
 tasks.withType(Jar).configureEach {
-    archiveFileName = "pishock-${project.mod_version}-${project.minecraft_version}-neoforge-${project.neo_version}.jar"
+    archiveFileName = "pishock-${activeModVersion}-${project.minecraft_version}-neoforge-${project.neo_version}.jar"
 }
 
 
@@ -162,7 +254,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,
-            mod_version            : mod_version,
+            mod_version            : activeModVersion,
             update_json_url        : update_json_url,
             mod_authors            : mod_authors,
             mod_description        : mod_description
