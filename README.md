@@ -1,5 +1,7 @@
 # PiShock NeoForge Mod
 
+![](https://img.shields.io/badge/Enviroment-Client-purple?style=for-the-badge) ![](https://img.shields.io/badge/Loader-NeoForge-a8320c?style=for-the-badge) ![Build and unit tests](https://img.shields.io/github/actions/workflow/status/RaithSphere/PiShock-NeoForge/build.yml?branch=main&label=Build%20%26%20Unit%20Tests&style=for-the-badge)
+
 Not intended for users below the age of 18.
 
 This project carries personal risk and was developed as a masochistic gameplay mod. If you are below the age of majority, please do not use it.
