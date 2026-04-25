@@ -247,6 +247,11 @@ public class PiShock {
         }
     }
 
+    public enum PiShockTransport {
+        WebSocket,
+        Serial
+    }
+
     private record ShockRequest(int intensity, int durationMs) {
     }
 

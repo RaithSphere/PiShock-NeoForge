@@ -7,10 +7,16 @@ import com.google.gson.JsonObject;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+import me.shedaniel.clothconfig2.gui.entries.IntegerListEntry;
+import me.shedaniel.clothconfig2.gui.entries.SelectionListEntry;
 import me.shedaniel.clothconfig2.gui.entries.StringListListEntry;
 import me.shedaniel.clothconfig2.gui.entries.StringListEntry;
+import me.shedaniel.clothconfig2.gui.entries.TextListEntry;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.client.event.ScreenEvent;
@@ -30,22 +36,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public final class PiShockClothConfigScreen {
     private static final Gson GSON = new Gson();
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private static final Map<Screen, FetchContext> FETCH_CONTEXTS = new WeakHashMap<>();
-    private static final Map<Screen, ActionButtons> ACTION_BUTTONS = new WeakHashMap<>();
     private static volatile List<DevicePair> CACHED_DEVICE_ROUTES = List.of();
+    private static volatile SerialDisplay SERIAL_DISPLAY = SerialDisplay.empty();
 
     private PiShockClothConfigScreen() {
     }
 
     public static Screen create(Screen parent) {
-        return create(parent, false);
+        return create(parent, false, false);
     }
 
     public static Screen create(Screen parent, boolean openApiFirst) {
+        return create(parent, openApiFirst, false);
+    }
+
+    private static Screen create(Screen parent, boolean openApiFirst, boolean openSerialFirst) {
         ConfigBuilder builder = ConfigBuilder.create()
                 .setParentScreen(parent)
                 .setTitle(Component.literal("PiShock Setup"));
@@ -53,12 +65,15 @@ public final class PiShockClothConfigScreen {
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
         ConfigCategory behavior;
         ConfigCategory api;
+        ConfigCategory serial;
         if (openApiFirst) {
-            api = builder.getOrCreateCategory(Component.literal("API"));
             behavior = builder.getOrCreateCategory(Component.literal("Behavior"));
+            api = builder.getOrCreateCategory(Component.literal("API"));
+            serial = builder.getOrCreateCategory(Component.literal("Serial"));
         } else {
             behavior = builder.getOrCreateCategory(Component.literal("Behavior"));
             api = builder.getOrCreateCategory(Component.literal("API"));
+            serial = builder.getOrCreateCategory(Component.literal("Serial"));
         }
         api.addEntry(entryBuilder.startTextDescription(Component.literal(
                         "Click Fetch IDs to populate User ID, Hub ID, and Shocker ID from your PiShock account."))
@@ -107,6 +122,9 @@ public final class PiShockClothConfigScreen {
         behavior.addEntry(entryBuilder.startEnumSelector(Component.literal("Mode"), PiShock.PiShockMode.class, PiShockConfig.PISHOCK_MODE.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_MODE::set)
                 .build());
+        behavior.addEntry(entryBuilder.startEnumSelector(Component.literal("Transport"), PiShock.PiShockTransport.class, PiShockConfig.PISHOCK_TRANSPORT.get())
+                .setSaveConsumer(PiShockConfig.PISHOCK_TRANSPORT::set)
+                .build());
         behavior.addEntry(entryBuilder.startBooleanToggle(Component.literal("Trigger On Death"), PiShockConfig.PISHOCK_TRIGGER_ON_DEATH.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_TRIGGER_ON_DEATH::set)
                 .build());
@@ -134,6 +152,32 @@ public final class PiShockClothConfigScreen {
         behavior.addEntry(entryBuilder.startIntField(Component.literal("Queue Max Size"), PiShockConfig.PISHOCK_QUEUE_MAX_SIZE.get())
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_QUEUE_MAX_SIZE.set(clamp(value, 1, 512)))
                 .build());
+
+        serial.addEntry(entryBuilder.startTextDescription(Component.translatable("pishock.configuration.serial.description"))
+                .build());
+        String[] serialPortOptions = serialPortOptions();
+        SelectionListEntry<String> serialPortEntry = entryBuilder.startSelector(Component.translatable("pishock.configuration.serial.port"), serialPortOptions, selectedSerialPort(serialPortOptions))
+                .setNameProvider(PiShockClothConfigScreen::serialPortLabel)
+                .setSaveConsumer(PiShockClothConfigScreen::setSerialPort)
+                .build();
+        IntegerListEntry serialBaudEntry = entryBuilder.startIntField(Component.translatable("pishock.configuration.serial.baud"), PiShockConfig.PISHOCK_SERIAL_BAUD.get())
+                .setSaveConsumer(value -> PiShockConfig.PISHOCK_SERIAL_BAUD.set(clamp(value, 1200, 921600)))
+                .build();
+        StringListEntry serialShockerIdEntry = entryBuilder.startStrField(Component.translatable("pishock.configuration.serial.shocker_id"), PiShockConfig.PISHOCK_SHOCKER_ID.get())
+                .setSaveConsumer(PiShockConfig.PISHOCK_SHOCKER_ID::set)
+                .build();
+        SerialContext serialContext = new SerialContext(parent, usernameEntry, apiKeyEntry, userIdEntry, hubIdEntry, shockerIdEntry, serialShockerIdEntry, serialPortEntry, serialBaudEntry);
+        serial.addEntry(new SerialControlsEntry(
+                queryButton -> runSerialConnect(queryButton, serialContext),
+                saveButton -> saveSerialConfig(saveButton, serialContext)
+        ));
+        serial.addEntry(new RightAlignedInfoEntry("pishock.configuration.serial.type", () -> SERIAL_DISPLAY.type()));
+        serial.addEntry(new RightAlignedInfoEntry("pishock.configuration.serial.client_id", () -> SERIAL_DISPLAY.clientId()));
+        serial.addEntry(new RightAlignedInfoEntry("pishock.configuration.serial.firmware", () -> SERIAL_DISPLAY.firmware()));
+        serial.addEntry(new RightAlignedInfoEntry("pishock.configuration.serial.shockers", () -> SERIAL_DISPLAY.shockers()));
+        serial.addEntry(serialShockerIdEntry);
+        serial.addEntry(serialPortEntry);
+        serial.addEntry(serialBaudEntry);
 
         builder.setAfterInitConsumer(screen -> {
             synchronized (FETCH_CONTEXTS) {
@@ -175,25 +219,9 @@ public final class PiShockClothConfigScreen {
                 .bounds(x + smallWidth + gap, y + buttonHeight + 4, smallWidth, buttonHeight)
                 .build();
         event.addListener(testVibrationButton);
-
-        synchronized (ACTION_BUTTONS) {
-            ACTION_BUTTONS.put(event.getScreen(), new ActionButtons(fetchButton, checkButton, testVibrationButton));
-        }
     }
 
     public static void onScreenRender(ScreenEvent.Render.Post event) {
-        ActionButtons buttons;
-        synchronized (ACTION_BUTTONS) {
-            buttons = ACTION_BUTTONS.get(event.getScreen());
-        }
-        if (buttons == null) {
-            return;
-        }
-
-        boolean show = isApiTabSelected(event.getScreen());
-        buttons.fetchButton.visible = show;
-        buttons.checkButton.visible = show;
-        buttons.testButton.visible = show;
     }
 
     private static void fetchIds(Button button, FetchContext context) {
@@ -277,7 +305,7 @@ public final class PiShockClothConfigScreen {
                     return;
                 }
 
-                boolean ok = message != null && message.contains("Connectivity OK");
+                boolean ok = message != null && (message.contains("Connectivity OK") || message.contains("Serial check OK"));
                 button.setMessage(Component.literal(ok ? "OK" : "Issue"));
             });
         });
@@ -299,6 +327,66 @@ public final class PiShockClothConfigScreen {
                 button.setMessage(Component.literal(ok ? "Sent" : "Fail"));
             });
         });
+    }
+
+    private static void runSerialConnect(Button button, SerialContext context) {
+        applySerialConfig(context);
+        button.active = false;
+        button.setMessage(Component.literal("..."));
+        ShockHandler.fetchSerialInfoAsync().whenComplete((result, throwable) -> {
+            Minecraft minecraft = Minecraft.getInstance();
+            minecraft.execute(() -> {
+                button.active = true;
+                if (throwable != null || result == null || !result.success()) {
+                    button.setMessage(Component.literal("Fail"));
+                    Utils.sendToMinecraftChat("[PiShock] Serial connect failed.");
+                    return;
+                }
+
+                if (result.clientId() != null) {
+                    context.hubIdEntry.setValue(Integer.toString(result.clientId()));
+                    PiShockConfig.PISHOCK_HUB_ID.set(result.clientId());
+                }
+                if (result.shockerId() != null) {
+                    context.shockerIdEntry.setValue(Integer.toString(result.shockerId()));
+                    context.serialShockerIdEntry.setValue(Integer.toString(result.shockerId()));
+                    PiShockConfig.PISHOCK_SHOCKER_ID.set(Integer.toString(result.shockerId()));
+                }
+                PiShockConfig.save();
+                SERIAL_DISPLAY = SerialDisplay.from(result);
+
+                button.setMessage(Component.literal("Found"));
+                Utils.sendToMinecraftChat(result.message());
+            });
+        });
+    }
+
+    private static void saveSerialConfig(Button button, SerialContext context) {
+        applySerialConfig(context);
+        button.setMessage(Component.literal("Saved"));
+        Utils.sendToMinecraftChat("[PiShock] Serial settings saved.");
+    }
+
+    private static void setSerialPort(String value) {
+        PiShockConfig.PISHOCK_SERIAL_PORT.set(value == null ? "" : value);
+    }
+
+    private static void applySerialConfig(SerialContext context) {
+        PiShockConfig.PISHOCK_SERIAL_PORT.set(context.serialPortEntry.getValue() == null ? "" : context.serialPortEntry.getValue());
+        PiShockConfig.PISHOCK_SERIAL_BAUD.set(clamp(context.serialBaudEntry.getValue(), 1200, 921600));
+        saveOpenConfigScreen();
+        PiShockConfig.PISHOCK_SERIAL_PORT.set(context.serialPortEntry.getValue() == null ? "" : context.serialPortEntry.getValue());
+        PiShockConfig.PISHOCK_SERIAL_BAUD.set(clamp(context.serialBaudEntry.getValue(), 1200, 921600));
+        PiShockConfig.save();
+    }
+
+    private static void saveOpenConfigScreen() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof me.shedaniel.clothconfig2.gui.ClothConfigScreen clothScreen) {
+            clothScreen.save();
+            return;
+        }
+        PiShockConfig.save();
     }
 
     private static Integer fetchUserId(String username, String apiKey) throws Exception {
@@ -520,6 +608,34 @@ public final class PiShockClothConfigScreen {
         return lines;
     }
 
+    private static String[] serialPortOptions() {
+        List<String> ports = new ArrayList<>(ShockHandler.listSerialPortOptions());
+        String configuredPort = PiShockConfig.PISHOCK_SERIAL_PORT.get();
+        if (configuredPort != null && !configuredPort.isBlank() && !ports.contains(configuredPort)) {
+            ports.add(configuredPort);
+        }
+        return ports.toArray(String[]::new);
+    }
+
+    private static String selectedSerialPort(String[] options) {
+        String configuredPort = PiShockConfig.PISHOCK_SERIAL_PORT.get();
+        if (configuredPort == null || configuredPort.isBlank()) {
+            return "";
+        }
+        for (String option : options) {
+            if (configuredPort.equals(option)) {
+                return option;
+            }
+        }
+        return "";
+    }
+
+    private static Component serialPortLabel(String port) {
+        return port == null || port.isBlank()
+                ? Component.translatable("pishock.configuration.serial.auto_detect")
+                : Component.literal(port);
+    }
+
     private static void logFetch(String message) {
         if (!PiShockConfig.PISHOCK_DEBUG.get()) {
             return;
@@ -539,18 +655,121 @@ public final class PiShockClothConfigScreen {
         return oneLine.substring(0, max) + "...(truncated)";
     }
 
-    private static boolean isApiTabSelected(Screen screen) {
-        if (screen instanceof me.shedaniel.clothconfig2.gui.ClothConfigScreen clothScreen) {
-            Component selected = clothScreen.getSelectedCategory();
-            return selected != null && "API".equalsIgnoreCase(selected.getString());
-        }
-        return true;
-    }
-
     private record DevicePair(int hubId, int shockerId) {
     }
 
     private record LookupResult(int userId, List<DevicePair> devices) {
+    }
+
+    private record SerialDisplay(String type, String clientId, String firmware, String shockers) {
+        private static SerialDisplay empty() {
+            return new SerialDisplay("", "", "", "");
+        }
+
+        private static SerialDisplay from(ShockHandler.SerialInfoResult result) {
+            return new SerialDisplay(
+                    formatType(result.type()),
+                    result.clientId() == null ? "" : Integer.toString(result.clientId()),
+                    formatFirmware(result.firmwareVersion()),
+                    result.shockers() == null ? "" : result.shockers()
+            );
+        }
+
+        private static String formatType(Integer type) {
+            if (type == null) {
+                return "";
+            }
+            return switch (type) {
+                case 3 -> "Next (3)";
+                case 4 -> "Lite (4)";
+                default -> Integer.toString(type);
+            };
+        }
+
+        private static String formatFirmware(String firmwareVersion) {
+            if (firmwareVersion == null || firmwareVersion.isBlank()) {
+                return "";
+            }
+            String[] parts = firmwareVersion.split("\\.");
+            if (parts.length < 3) {
+                return firmwareVersion;
+            }
+            return parts[0] + "." + parts[1] + "." + parts[2];
+        }
+    }
+
+    private static final class RightAlignedInfoEntry extends TextListEntry {
+        private static final int TEXT_PADDING = 6;
+        private final Component label;
+        private final Supplier<String> valueSupplier;
+
+        private RightAlignedInfoEntry(String translationKey, Supplier<String> valueSupplier) {
+            super(Component.translatable(translationKey), Component.empty());
+            this.label = Component.translatable(translationKey);
+            this.valueSupplier = valueSupplier;
+        }
+
+        @Override
+        public void render(GuiGraphics graphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float delta) {
+            var font = Minecraft.getInstance().font;
+            int textY = y + (entryHeight - font.lineHeight) / 2;
+            graphics.drawString(font, label, x + TEXT_PADDING, textY, getPreferredTextColor());
+            String rawValue = valueSupplier.get();
+            Component value = Component.literal(rawValue == null || rawValue.isBlank() ? "-" : rawValue);
+            int valueWidth = font.width(value);
+            graphics.drawString(font, value, x + entryWidth - valueWidth - TEXT_PADDING, textY, getPreferredTextColor());
+        }
+    }
+
+    private static final class SerialControlsEntry extends TextListEntry {
+        private static final int TEXT_PADDING = 6;
+        private static final int BUTTON_WIDTH = 72;
+        private static final int BUTTON_HEIGHT = 20;
+        private static final int BUTTON_GAP = 4;
+        private static final int ENTRY_HEIGHT = 28;
+        private final Component label = Component.translatable("pishock.configuration.serial.connection");
+        private final Button queryButton;
+        private final Button saveButton;
+
+        private SerialControlsEntry(Consumer<Button> onQuery, Consumer<Button> onSave) {
+            super(Component.translatable("pishock.configuration.serial.connection"), Component.empty());
+            this.queryButton = Button.builder(Component.translatable("pishock.configuration.serial.query"), onQuery::accept)
+                    .bounds(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
+                    .build();
+            this.saveButton = Button.builder(Component.translatable("pishock.configuration.serial.save"), onSave::accept)
+                    .bounds(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
+                    .build();
+        }
+
+        @Override
+        public void render(GuiGraphics graphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float delta) {
+            var font = Minecraft.getInstance().font;
+            int textY = y + (entryHeight - font.lineHeight) / 2;
+            graphics.drawString(font, label, x + TEXT_PADDING, textY, getPreferredTextColor());
+            int buttonsWidth = (BUTTON_WIDTH * 2) + BUTTON_GAP;
+            int buttonY = y + (entryHeight - BUTTON_HEIGHT) / 2;
+            queryButton.setX(x + entryWidth - buttonsWidth - TEXT_PADDING);
+            queryButton.setY(buttonY);
+            saveButton.setX(x + entryWidth - BUTTON_WIDTH - TEXT_PADDING);
+            saveButton.setY(buttonY);
+            queryButton.render(graphics, mouseX, mouseY, delta);
+            saveButton.render(graphics, mouseX, mouseY, delta);
+        }
+
+        @Override
+        public int getItemHeight() {
+            return ENTRY_HEIGHT;
+        }
+
+        @Override
+        public List<? extends GuiEventListener> children() {
+            return List.of(queryButton, saveButton);
+        }
+
+        @Override
+        public List<? extends NarratableEntry> narratables() {
+            return List.of(queryButton, saveButton);
+        }
     }
 
     private record FetchContext(
@@ -563,6 +782,17 @@ public final class PiShockClothConfigScreen {
     ) {
     }
 
-    private record ActionButtons(Button fetchButton, Button checkButton, Button testButton) {
+    private record SerialContext(
+            Screen parentScreen,
+            StringListEntry usernameEntry,
+            StringListEntry apiKeyEntry,
+            StringListEntry userIdEntry,
+            StringListEntry hubIdEntry,
+            StringListEntry shockerIdEntry,
+            StringListEntry serialShockerIdEntry,
+            SelectionListEntry<String> serialPortEntry,
+            IntegerListEntry serialBaudEntry
+    ) {
     }
+
 }

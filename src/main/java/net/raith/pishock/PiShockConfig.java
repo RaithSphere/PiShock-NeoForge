@@ -13,6 +13,18 @@ public class PiShockConfig {
             .comment("PiShock mode", "SHOCK is the intended mode for this mod")
             .defineEnum("PiShock_Mode", PiShock.PiShockMode.Shock);
 
+    public static final ModConfigSpec.ConfigValue<PiShock.PiShockTransport> PISHOCK_TRANSPORT = BUILDER
+            .comment("How to send PiShock operations", "WebSocket uses the broker API. Serial uses a locally attached PiShock V3 hub over USB.")
+            .defineEnum("PiShock_Transport", PiShock.PiShockTransport.WebSocket);
+
+    public static final ModConfigSpec.ConfigValue<String> PISHOCK_SERIAL_PORT = BUILDER
+            .comment("Serial port for local PiShock V3 hub", "Leave blank to auto-detect VID 0x1A86 with PID 0x7523 or 0x55D4.")
+            .define("PiShock_SerialPort", "");
+
+    public static final ModConfigSpec.IntValue PISHOCK_SERIAL_BAUD = BUILDER
+            .comment("Serial baud rate for local PiShock V3 hub", "Official PiShock serial API uses 115200 baud.")
+            .defineInRange("PiShock_SerialBaud", 115200, 1200, 921600);
+
     public static final ModConfigSpec.BooleanValue PISHOCK_ENABLED = BUILDER
             .comment("Master enable switch for API calls")
             .define("PiShock_Enabled", false);
