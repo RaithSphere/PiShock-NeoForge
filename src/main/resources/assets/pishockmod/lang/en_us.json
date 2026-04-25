@@ -18,7 +18,7 @@
   "pishock.configuration.PiShock_QueueEnabled": "Queue Shocks",
   "pishock.configuration.PiShock_QueueMaxSize": "Queue Max Size",
   "pishock.configuration.PiShock_DeathIntensity": "Max Shock",
-  "pishock.configuration.serial.description": "Serial transport requires a local PiShock running firmware V3 hub over USB and a configured Shocker ID. Leave Serial Port blank to auto-detect a single attached PiShock hub.",
+  "pishock.configuration.serial.description": "Serial transport requires a local PiShock running firmware V3 hub over USB and a configured Shocker ID.",
   "pishock.configuration.serial.connection": "Serial Connection",
   "pishock.configuration.serial.query": "Query",
   "pishock.configuration.serial.save": "Save",
