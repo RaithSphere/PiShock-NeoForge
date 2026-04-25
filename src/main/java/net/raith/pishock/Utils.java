@@ -13,12 +13,16 @@ public class Utils {
     }
 
     public static void sendToMinecraftChat(@Nonnull final String message) {
+        sendToMinecraftChat(Component.literal(message));
+    }
+
+    public static void sendToMinecraftChat(@Nonnull final Component message) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
             return;
         }
 
         // Ensure chat mutations always run on the main client thread.
-        minecraft.execute(() -> minecraft.gui.getChat().addMessage(Component.literal(message)));
+        minecraft.execute(() -> minecraft.gui.getChat().addMessage(message));
     }
 }

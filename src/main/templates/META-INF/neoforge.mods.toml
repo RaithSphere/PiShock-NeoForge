@@ -29,10 +29,10 @@ version="${mod_version}" #mandatory
 displayName="${mod_name}" #mandatory
 
 # A URL to query for updates for this mod. See the JSON update specification https://docs.neoforged.net/docs/misc/updatechecker/
-#updateJSONURL="https://change.me.example.invalid/updates.json" #optional
+updateJSONURL="${update_json_url}" #optional
 
 # A URL for the "homepage" for this mod, displayed in the mod UI
-displayURL="https://raith.one/" #optional
+displayURL="https://www.curseforge.com/minecraft/mc-mods/pishock" #optional
 
 # A file name (in the root of the mod JAR) containing a logo for display
 logoFile="logo.png" #optional
@@ -44,9 +44,11 @@ logoFile="logo.png" #optional
 authors="${mod_authors}" #optional
 
 # The description text for the mod (multi line!) (#mandatory)
-description='''PiShock Shock Collar Integration for Minecraft
+description='''PiShock integration for Minecraft.
 
-This simple client-only mod allows players to connect their PiShock device to the game for added stakes. Whenever the player takes damage, they will receive a corresponding shock. The intensity of the shock can be configured and will scale based on the amount of damage taken.
+This client-side NeoForge mod connects Minecraft damage events to PiShock devices for adult players who want higher-stakes gameplay. It supports Shock, Vibrate, and Beep modes; configurable intensity and millisecond duration; damage scaling; death triggers; queued and combined damage events; broker error reporting; and in-game setup tools for fetching and validating PiShock account and shocker IDs.
+
+The mod works in multiplayer, including non-modded servers, and includes a quick enable/disable hotkey, config screens, and optional debug/status chat output.
 
 ---
 

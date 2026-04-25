@@ -19,12 +19,14 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.VersionChecker;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.PlayerHeartTypeEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
@@ -266,6 +268,12 @@ public class PiShock {
 
     @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
     public static class ClientModEvents {
+        private static final int UPDATE_CHECK_MAX_TICKS = 600;
+        private static final int UPDATE_CHECK_RETRY_TICKS = 20;
+        private static boolean updateNotificationDone = false;
+        private static int updateCheckTicksRemaining = 0;
+        private static int updateCheckRetryTicks = 0;
+
         public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
             event.register(TOGGLE_KEY);
         }
@@ -304,6 +312,42 @@ public class PiShock {
                 Utils.sendToMinecraftChat(enabled
                         ? "[PiShock] Quick toggle: Enabled"
                         : "[PiShock] Quick toggle: Disabled");
+            }
+
+            showUpdateNotificationWhenReady();
+        }
+
+        @SubscribeEvent
+        public static void onClientPlayerLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
+            if (updateNotificationDone) {
+                return;
+            }
+
+            updateCheckTicksRemaining = UPDATE_CHECK_MAX_TICKS;
+            updateCheckRetryTicks = 0;
+        }
+
+        private static void showUpdateNotificationWhenReady() {
+            Minecraft minecraft = Minecraft.getInstance();
+            if (updateNotificationDone || minecraft.player == null || updateCheckTicksRemaining <= 0) {
+                return;
+            }
+
+            updateCheckTicksRemaining--;
+            if (updateCheckRetryTicks > 0) {
+                updateCheckRetryTicks--;
+                return;
+            }
+
+            VersionChecker.CheckResult result = VersionChecker.getResult(PiShock.getModContainer().getModInfo());
+            switch (result.status()) {
+                case OUTDATED, BETA_OUTDATED -> {
+                    Utils.sendToMinecraftChat("[PiShock] Update available: " + result.target()
+                            + ". Download: " + result.url());
+                    updateNotificationDone = true;
+                }
+                case PENDING -> updateCheckRetryTicks = UPDATE_CHECK_RETRY_TICKS;
+                default -> updateNotificationDone = true;
             }
         }
 
