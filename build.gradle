@@ -70,6 +70,10 @@ def updateModVersionProperty = { String newVersion ->
     modPropertiesFile.setText(updatedLines.join(System.lineSeparator()) + System.lineSeparator(), 'UTF-8')
 }
 
+def curseForgeToken = providers.environmentVariable('CURSEFORGE_TOKEN')
+        .orElse(providers.gradleProperty('curseforge_token'))
+        .orElse('')
+
 def versionBumpTasks = [
         'buildNewRelease',
         'publishCurseForgeRelease',
@@ -157,7 +161,18 @@ tasks.register('publishCurseForgeRelease', Exec) {
     dependsOn tasks.named('buildNewRelease')
 
     def gradleCommand = System.getProperty('os.name').toLowerCase().contains('windows') ? file('gradlew.bat') : file('gradlew')
-    commandLine gradleCommand, 'curseforge1520971', '-PskipVersionBump', '--no-configuration-cache', '--console=plain'
+    def publishArgs = ['curseforge1520971', '-PskipVersionBump', '--no-configuration-cache', '--console=plain']
+    if (project.hasProperty('curseforgeDebug')) {
+        publishArgs.add('-PcurseforgeDebug')
+    }
+    commandLine([gradleCommand] + publishArgs)
+    environment 'CURSEFORGE_TOKEN', curseForgeToken.get()
+
+    doFirst {
+        if (curseForgeToken.get().isBlank()) {
+            throw new GradleException('Missing CurseForge token. Set CURSEFORGE_TOKEN or curseforge_token in ~/.gradle/gradle.properties.')
+        }
+    }
 }
 
 tasks.register('testClient') {
@@ -341,21 +356,22 @@ publishing {
     }
 }
 
-def curseForgeToken = providers.environmentVariable('CURSEFORGE_TOKEN')
-        .orElse(providers.gradleProperty('curseforge_token'))
-        .orElse('')
-
 curseforge {
     apiKey = curseForgeToken.get()
 
+    options {
+        debug = project.hasProperty('curseforgeDebug')
+    }
+
     project {
+        apiKey = curseForgeToken.get()
         id = '1520971'
         releaseType = 'release'
         changelogType = 'markdown'
         changelog = "PiShock ${activeModVersion}"
         addGameVersion minecraft_version
         addGameVersion 'NeoForge'
-        addGameVersion 'Java 21'
+        addGameVersion 'Client'
         mainArtifact(jar) {
             displayName = "PiShock ${activeModVersion} for Minecraft ${minecraft_version}"
         }
