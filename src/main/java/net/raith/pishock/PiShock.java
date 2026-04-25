@@ -12,7 +12,7 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.commands.Commands;
 import net.neoforged.api.distmarker.Dist;
@@ -27,10 +27,10 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.event.PlayerHeartTypeEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.event.entity.player.PlayerHeartTypeEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -50,10 +50,8 @@ public class PiShock {
 
     public static final String MOD_ID = "pishock";
     public static final Logger LOGGER = LogUtils.getLogger();
-    private static final Identifier MAIN_MENU_ICON = Identifier.fromNamespaceAndPath(MOD_ID, "pishock_setup");
-    private static final KeyMapping.Category KEY_CATEGORY = KeyMapping.Category.register(
-            Identifier.fromNamespaceAndPath(MOD_ID, "controls")
-    );
+    private static final ResourceLocation MAIN_MENU_ICON = ResourceLocation.fromNamespaceAndPath(MOD_ID, "pishock_setup");
+    private static final String KEY_CATEGORY = "key.categories." + MOD_ID;
     private static final KeyMapping TOGGLE_KEY = new KeyMapping(
             "key.pishock.toggle_enabled",
             InputConstants.Type.KEYSYM,
