@@ -9,6 +9,7 @@ This project carries personal risk and was developed as a masochistic gameplay m
 ## Notable Features
 - Works in multiplayer, including non-modded servers.
 - Uses PiShock's current websocket broker API (`wss://broker.pishock.com/v2`).
+- Supports local serial communication with PiShock V3 hubs over USB.
 - Supports Shock, Vibrate, and Beep modes.
 - Millisecond-precise duration settings (`100ms` to `15000ms`).
 - Queues and combines damage events that occur in quick succession.
@@ -19,7 +20,9 @@ This project carries personal risk and was developed as a masochistic gameplay m
 - Auto-discovery for `UserId`, `HubId`, and `ShockerId` (`/Account` + `/Shockers`).
 - In-game setup UI with:
   - `Fetch IDs`
-  - `Check API`
+  - `Check`
+  - `Test`
+  - `Serial`
 - Quick enable/disable hotkey (default `F12`).
 - Client debug command:
   - `/pishock debug`
@@ -46,7 +49,9 @@ This project carries personal risk and was developed as a masochistic gameplay m
 - Launch Minecraft and open **PiShock Setup** from the main menu icon.
 - Enter your PiShock username and API key.
 - Use **Fetch IDs** to pull account/device routing values.
-- Optionally use **Check API** to validate API + websocket connectivity before live use.
+- Use **Transport** to choose `WebSocket` or `Serial`.
+- For serial transport, open the **Serial** tab, connect a PiShock V3 hub over USB, set **Serial Port** or leave it blank for auto-detection, then use **Serial** to read firmware/device info and populate Hub/Shocker IDs when available.
+- Optionally use **Check** to validate the selected transport before live use.
 - Save config, then test with low values first.
 
 ## Comparison table - Thank you to [ScoreUnder] for this list <3 - Removed all abandoned versions
@@ -60,7 +65,7 @@ This project carries personal risk and was developed as a masochistic gameplay m
 | Singleplayer                    | :white_check_mark:    | :white_check_mark: |
 | Multiplayer                     | :white_check_mark:    | :white_check_mark: |
 | Works on vanilla servers        | :white_check_mark:    | :white_check_mark: |
-| Low-latency local serial API    | :x:                   | :white_check_mark: |
+| Low-latency local serial API    | :white_check_mark:    | :white_check_mark: |
 | Multiple simultaneous shockers  | :x:                   | :white_check_mark: |
 | Vibration support               | :white_check_mark:    | :white_check_mark: |
 | Vibration/shock threshold       | :x: / caps only       | :white_check_mark: |

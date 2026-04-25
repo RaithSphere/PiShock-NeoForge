@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -77,7 +78,23 @@ public class ShockHandler {
     }
 
     private static boolean sendOperation(PiShock.PiShockMode mode, float requestedIntensity, int requestedDurationMs, boolean respectConfiguredLimits) {
-        debug("Shock request received: requestedIntensity=" + requestedIntensity + ", requestedDurationMs=" + requestedDurationMs);
+        debug("Shock request received: transport=" + PiShockConfig.PISHOCK_TRANSPORT.get()
+                + ", requestedIntensity=" + requestedIntensity + ", requestedDurationMs=" + requestedDurationMs);
+
+        ShockCore.OperationLimits limits = ShockCore.enforceOperationLimits(
+                Math.round(requestedIntensity),
+                requestedDurationMs,
+                respectConfiguredLimits,
+                PiShockConfig.PISHOCK_INTENSITY.get(),
+                PiShockConfig.PISHOCK_DURATION.get()
+        );
+        int intensity = limits.intensity();
+        int durationMs = limits.durationMs();
+
+        if (PiShockConfig.PISHOCK_TRANSPORT.get() == PiShock.PiShockTransport.Serial) {
+            return sendSerialOperation(mode, intensity, durationMs);
+        }
+
         String username = safeTrim(PiShockConfig.PISHOCK_USERNAME.get());
         String apiKey = safeTrim(PiShockConfig.PISHOCK_APIKEY.get());
 
@@ -97,15 +114,6 @@ public class ShockHandler {
             return false;
         }
 
-        ShockCore.OperationLimits limits = ShockCore.enforceOperationLimits(
-                Math.round(requestedIntensity),
-                requestedDurationMs,
-                respectConfiguredLimits,
-                PiShockConfig.PISHOCK_INTENSITY.get(),
-                PiShockConfig.PISHOCK_DURATION.get()
-        );
-        int intensity = limits.intensity();
-        int durationMs = limits.durationMs();
         debug("Resolved routing and clamped values: userId=" + discovery.userId + ", hubId=" + discovery.hubId
                 + ", shockerId=" + discovery.shockerId + ", intensity=" + intensity + ", durationMs=" + durationMs);
 
@@ -137,6 +145,41 @@ public class ShockHandler {
         );
 
         doApiCall(new PublishCommand(List.of(message)), username, apiKey, durationMs);
+        return true;
+    }
+
+    private static boolean sendSerialOperation(PiShock.PiShockMode mode, int intensity, int durationMs) {
+        Integer shockerId = parseInteger(PiShockConfig.PISHOCK_SHOCKER_ID.get());
+        if (shockerId == null) {
+            reportIssueToChat("serial-missing-shocker", "[PiShock] Serial transport requires a Shocker ID.");
+            return false;
+        }
+
+        if (isDispatchGapTooSmall()) {
+            reportIssueToChat("failsafe-dispatch-gap", "[PiShock] Failsafe blocked rapid consecutive command.");
+            debug("Failsafe blocked command due to minimum dispatch gap.");
+            return false;
+        }
+
+        boolean sent = SerialShockTransport.send(
+                PiShockConfig.PISHOCK_SERIAL_PORT.get(),
+                PiShockConfig.PISHOCK_SERIAL_BAUD.get(),
+                shockerId,
+                mode,
+                intensity,
+                durationMs
+        );
+        if (!sent) {
+            reportIssueToChat("serial-send-failed", "[PiShock] Serial command failed. Check the port and attached PiShock hub.");
+            return false;
+        }
+
+        PiShock.markShockVisual(durationMs);
+        debug("Serial command sent: shockerId=" + shockerId + ", mode=" + mode
+                + ", intensity=" + intensity + ", durationMs=" + durationMs);
+        if (PiShockConfig.PISHOCK_SHOW_SUCCESS_CONFIRMATION.get() && !isDebugActive()) {
+            reportSuccessToChat("[PiShock] Serial command sent " + intensity + "% (" + formatDurationSeconds(durationMs) + "s)");
+        }
         return true;
     }
 
@@ -352,6 +395,36 @@ public class ShockHandler {
         return CompletableFuture.supplyAsync(ShockHandler::checkConnectivity, EXECUTOR);
     }
 
+    public static CompletableFuture<SerialInfoResult> fetchSerialInfoAsync() {
+        return CompletableFuture.supplyAsync(() -> {
+            SerialShockTransport.Info info = SerialShockTransport.info(
+                    PiShockConfig.PISHOCK_SERIAL_PORT.get(),
+                    PiShockConfig.PISHOCK_SERIAL_BAUD.get()
+            );
+            if (info == null) {
+                return new SerialInfoResult(false, null, null, null, null, "",
+                        "[PiShock] Serial connect failed.");
+            }
+            Integer shockerId = info.firstShockerId();
+            String message = "[PiShock] Serial connected"
+                    + (info.firmwareVersion() == null ? "" : " firmware " + info.firmwareVersion())
+                    + (info.clientId() == null ? "" : ", hub " + info.clientId())
+                    + (shockerId == null ? "" : ", shocker " + shockerId)
+                    + ".";
+            return new SerialInfoResult(true, info.firmwareVersion(), info.type(), info.clientId(),
+                    shockerId, info.shockerSummary(), message);
+        }, EXECUTOR);
+    }
+
+    public static List<String> listSerialPortOptions() {
+        List<String> options = new ArrayList<>();
+        options.add("");
+        for (SerialShockTransport.PortInfo port : SerialShockTransport.listPorts()) {
+            options.add(port.systemName());
+        }
+        return options;
+    }
+
     public static void setDebugEnabled(boolean enabled) {
         debugEnabled = enabled;
         Utils.unilog("[PiShock Debug] " + (enabled ? "Enabled" : "Disabled"));
@@ -362,6 +435,20 @@ public class ShockHandler {
     }
 
     private static String checkConnectivity() {
+        if (PiShockConfig.PISHOCK_TRANSPORT.get() == PiShock.PiShockTransport.Serial) {
+            SerialShockTransport.Info info = SerialShockTransport.info(PiShockConfig.PISHOCK_SERIAL_PORT.get(), PiShockConfig.PISHOCK_SERIAL_BAUD.get());
+            boolean ok = info != null;
+            String msg = ok
+                    ? "[PiShock] Serial check OK"
+                    + (info.firmwareVersion() == null ? "" : ": firmware " + info.firmwareVersion())
+                    + "."
+                    : "[PiShock] Serial check failed: no unique PiShock hub found or port could not be opened.";
+            if (!ok) {
+                reportIssueToChat("check-serial-failed", msg);
+            }
+            return msg;
+        }
+
         String username = safeTrim(PiShockConfig.PISHOCK_USERNAME.get());
         String apiKey = safeTrim(PiShockConfig.PISHOCK_APIKEY.get());
 
@@ -600,6 +687,17 @@ public class ShockHandler {
         private boolean matches(String candidateUsername, String candidateApiKey) {
             return username.equals(candidateUsername) && apiKey.equals(candidateApiKey);
         }
+    }
+
+    public record SerialInfoResult(
+            boolean success,
+            String firmwareVersion,
+            Integer type,
+            Integer clientId,
+            Integer shockerId,
+            String shockers,
+            String message
+    ) {
     }
 
     @SuppressWarnings("unused")
