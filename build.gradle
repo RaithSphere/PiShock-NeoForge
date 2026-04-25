@@ -2,6 +2,7 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'net.neoforged.moddev' version '2.0.107'
+    id 'me.hypherionmc.cursegradle' version '2.0.1'
     id 'idea'
 }
 
@@ -35,6 +36,28 @@ def computeNextModVersion = { String currentVersion ->
     return "${todayPrefix}.1"
 }
 
+def computeReleaseModVersion = { String currentVersion ->
+    def today = java.time.LocalDate.now()
+    def todayPrefix = today.format(java.time.format.DateTimeFormatter.ofPattern('yy.MM.dd'))
+    def matcher = currentVersion =~ modVersionPattern
+
+    if (!matcher.matches()) {
+        return "${todayPrefix}.1"
+    }
+
+    def currentPrefix = String.format('%s.%02d.%02d',
+            matcher[0][1],
+            matcher[0][2] as int,
+            matcher[0][3] as int)
+    if (currentPrefix != todayPrefix) {
+        return "${todayPrefix}.1"
+    }
+
+    def releaseJarName = "pishock-${currentVersion}-${minecraft_version}-neoforge-${neo_version}.jar"
+    def releaseJarFile = file("E:/PiShock Mod Builds/${minecraft_version}/${releaseJarName}")
+    releaseJarFile.exists() ? computeNextModVersion(currentVersion) : currentVersion
+}
+
 def computeResetModVersion = {
     def today = java.time.LocalDate.now()
     "${today.format(java.time.format.DateTimeFormatter.ofPattern('yy.MM.dd'))}.1"
@@ -48,10 +71,9 @@ def updateModVersionProperty = { String newVersion ->
 }
 
 def versionBumpTasks = [
-        'assemble',
-        'build',
         'buildNewRelease',
-        'jar',
+        'publishCurseForgeRelease',
+        'curseforge1520971',
         'publish',
         'publishAllPublicationsToMavenRepository',
         'publishMavenJavaPublicationToMavenRepository'
@@ -65,7 +87,7 @@ def shouldAutoBumpVersion = (
 
 def activeModVersion = mod_version
 if (shouldAutoBumpVersion) {
-    activeModVersion = computeNextModVersion(mod_version)
+    activeModVersion = computeReleaseModVersion(mod_version)
     if (activeModVersion != mod_version) {
         updateModVersionProperty(activeModVersion)
         logger.lifecycle("Updated mod_version from ${mod_version} to ${activeModVersion}")
@@ -127,6 +149,15 @@ tasks.register('buildNewReleaseNoBump', Copy) {
 
     from tasks.named('jar').flatMap { it.archiveFile }
     into file("E:/PiShock Mod Builds/${minecraft_version}")
+}
+
+tasks.register('publishCurseForgeRelease', Exec) {
+    group = 'Raith'
+    description = 'Builds the mod and publishes the jar to CurseForge. Requires CURSEFORGE_TOKEN or ~/.gradle/gradle.properties curseforge_token.'
+    dependsOn tasks.named('buildNewRelease')
+
+    def gradleCommand = System.getProperty('os.name').toLowerCase().contains('windows') ? file('gradlew.bat') : file('gradlew')
+    commandLine gradleCommand, 'curseforge1520971', '-PskipVersionBump', '--no-configuration-cache', '--console=plain'
 }
 
 tasks.register('testClient') {
@@ -307,6 +338,36 @@ publishing {
         maven {
             url "file://${project.projectDir}/repo"
         }
+    }
+}
+
+def curseForgeToken = providers.environmentVariable('CURSEFORGE_TOKEN')
+        .orElse(providers.gradleProperty('curseforge_token'))
+        .orElse('')
+
+curseforge {
+    apiKey = curseForgeToken.get()
+
+    project {
+        id = '1520971'
+        releaseType = 'release'
+        changelogType = 'markdown'
+        changelog = "PiShock ${activeModVersion}"
+        addGameVersion minecraft_version
+        addGameVersion 'NeoForge'
+        addGameVersion 'Java 21'
+        mainArtifact(jar) {
+            displayName = "PiShock ${activeModVersion} for Minecraft ${minecraft_version}"
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.named('curseforge').configure {
+        notCompatibleWithConfigurationCache('CurseGradle upload tasks are not configuration-cache compatible.')
+    }
+    tasks.named('curseforge1520971').configure {
+        notCompatibleWithConfigurationCache('CurseGradle upload tasks are not configuration-cache compatible.')
     }
 }
 
