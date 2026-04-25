@@ -38,7 +38,7 @@ This project carries personal risk and was developed as a masochistic gameplay m
 - Confirm your PiShock API key was generated on or after `2024-10-15` (required by websocket API login).
 
 ## Requirements
-- Minecraft 1.21.1
+- A supported Minecraft 1.21.x version
 - NeoForge
 - Cloth Config (NeoForge build)
 
