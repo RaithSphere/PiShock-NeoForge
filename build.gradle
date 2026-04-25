@@ -35,6 +35,11 @@ def computeNextModVersion = { String currentVersion ->
     return "${todayPrefix}.1"
 }
 
+def computeResetModVersion = {
+    def today = java.time.LocalDate.now()
+    "${today.format(java.time.format.DateTimeFormatter.ofPattern('yy.MM.dd'))}.1"
+}
+
 def updateModVersionProperty = { String newVersion ->
     def updatedLines = modPropertiesFile.readLines('UTF-8').collect { line ->
         line.startsWith('mod_version=') ? "mod_version=${newVersion}" : line
@@ -88,19 +93,40 @@ tasks.register('bumpModVersion') {
     }
 }
 
-tasks.register('buildNewRelease') {
+tasks.register('resetModVersion') {
+    group = 'Raith'
+    description = 'Resets mod_version to today with build number 1 using the YY.MM.DD.1 pattern.'
+
+    doLast {
+        def currentVersion = modPropertiesFile.readLines('UTF-8')
+                .find { it.startsWith('mod_version=') }
+                ?.substring('mod_version='.length())
+        if (currentVersion == null) {
+            throw new GradleException('Could not find mod_version in gradle.properties')
+        }
+
+        def newVersion = computeResetModVersion()
+        updateModVersionProperty(newVersion)
+        logger.lifecycle("Updated mod_version from ${currentVersion} to ${newVersion}")
+    }
+}
+
+tasks.register('buildNewRelease', Copy) {
     group = 'Raith'
     description = 'Builds a release jar and copies it into E:\\PiShock Mod Builds\\<minecraft version>.'
     dependsOn tasks.named('build')
 
-    doLast {
-        def releaseDirectory = file("E:/PiShock Mod Builds/${project.minecraft_version}")
-        copy {
-            from tasks.named('jar').get().archiveFile
-            into releaseDirectory
-        }
-        logger.lifecycle("Copied release jar to ${releaseDirectory}")
-    }
+    from tasks.named('jar').flatMap { it.archiveFile }
+    into file("E:/PiShock Mod Builds/${minecraft_version}")
+}
+
+tasks.register('buildNewReleaseNoBump', Copy) {
+    group = 'Raith'
+    description = 'Builds a release jar without bumping mod_version and copies it into E:\\PiShock Mod Builds\\<minecraft version>.'
+    dependsOn tasks.named('build')
+
+    from tasks.named('jar').flatMap { it.archiveFile }
+    into file("E:/PiShock Mod Builds/${minecraft_version}")
 }
 
 tasks.register('testClient') {
