@@ -371,7 +371,9 @@ curseforge {
         changelog = "PiShock ${activeModVersion}"
         addGameVersion minecraft_version
         addGameVersion 'NeoForge'
-        addGameVersion 'Client'
+        relations {
+            requiredDependency 'cloth-config'
+        }
         mainArtifact(jar) {
             displayName = "PiShock ${activeModVersion} for Minecraft ${minecraft_version}"
         }
