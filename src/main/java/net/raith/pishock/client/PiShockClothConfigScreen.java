@@ -225,13 +225,27 @@ public final class PiShockClothConfigScreen {
                             return;
                         }
 
+                        context.usernameEntry.setValue(username);
+                        context.apiKeyEntry.setValue(apiKey);
                         context.userIdEntry.setValue(Integer.toString(result.userId));
-                        DevicePair preferred = choosePreferredRoute(result.devices, context.hubIdEntry.getValue(), context.shockerIdEntry.getValue());
-                        context.hubIdEntry.setValue(Integer.toString(preferred.hubId));
-                        context.shockerIdEntry.setValue(Integer.toString(preferred.shockerId));
+                        PiShockConfig.PISHOCK_USERNAME.set(username);
+                        PiShockConfig.PISHOCK_APIKEY.set(apiKey);
+                        PiShockConfig.PISHOCK_USER_ID.set(result.userId);
+
                         CACHED_DEVICE_ROUTES = List.copyOf(result.devices);
-                        logFetch("Fetch IDs success. userId=" + result.userId + ", routes=" + result.devices.size()
-                                + ", selected=Hub " + preferred.hubId + " / Shocker " + preferred.shockerId);
+                        if (!result.devices.isEmpty()) {
+                            DevicePair preferred = choosePreferredRoute(result.devices, context.hubIdEntry.getValue(), context.shockerIdEntry.getValue());
+                            context.hubIdEntry.setValue(Integer.toString(preferred.hubId));
+                            context.shockerIdEntry.setValue(Integer.toString(preferred.shockerId));
+                            PiShockConfig.PISHOCK_HUB_ID.set(preferred.hubId);
+                            PiShockConfig.PISHOCK_SHOCKER_ID.set(Integer.toString(preferred.shockerId));
+                            logFetch("Fetch IDs success. userId=" + result.userId + ", routes=" + result.devices.size()
+                                    + ", selected=Hub " + preferred.hubId + " / Shocker " + preferred.shockerId);
+                        } else {
+                            logFetch("Fetch IDs resolved userId=" + result.userId + " but no shocker routes were returned.");
+                        }
+
+                        PiShockConfig.save();
                         button.setMessage(Component.literal("Fetched"));
                         minecraft.setScreen(create(context.parentScreen, true));
                     });
@@ -242,7 +256,7 @@ public final class PiShockClothConfigScreen {
         try {
             Integer userId = fetchUserId(username, apiKey);
             List<DevicePair> devices = fetchDeviceRoutes(userId, apiKey);
-            if (userId == null || devices.isEmpty()) {
+            if (userId == null) {
                 return null;
             }
             return new LookupResult(userId, devices);
