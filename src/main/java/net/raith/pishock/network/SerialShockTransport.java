@@ -2,6 +2,7 @@ package net.raith.pishock.network;
 
 import com.fazecast.jSerialComm.SerialPort;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import net.raith.pishock.PiShock;
 
 import java.nio.charset.StandardCharsets;
@@ -13,16 +14,21 @@ final class SerialShockTransport {
     private static final int PISHOCK_VENDOR_ID = 0x1A86;
     private static final int PISHOCK_NEXT_PRODUCT_ID = 0x7523;
     private static final int PISHOCK_LITE_PRODUCT_ID = 0x55D4;
+    private static final int DATA_BITS = 8;
+    private static final int READ_BUFFER_SIZE = 256;
     private static final int WRITE_TIMEOUT_MS = 2000;
     private static final int READ_TIMEOUT_MS = 2500;
     private static final String TERMINAL_INFO_PREFIX = "TERMINALINFO:";
+    private static final String LINE_ENDING = "\n";
+    private static final String CMD_INFO = "info";
+    private static final String CMD_OPERATE = "operate";
 
     private SerialShockTransport() {
     }
 
     static boolean send(String configuredPortName, int baudRate, int shockerId, PiShock.PiShockMode mode, int intensity, int durationMs) {
         JsonObject command = buildOperateCommand(shockerId, mode, intensity, durationMs);
-        return writeLine(configuredPortName, baudRate, command.toString());
+        return sendCommand(configuredPortName, baudRate, command.toString());
     }
 
     static boolean check(String configuredPortName, int baudRate) {
@@ -30,9 +36,8 @@ final class SerialShockTransport {
     }
 
     static Info info(String configuredPortName, int baudRate) {
-        JsonObject command = new JsonObject();
-        command.addProperty("cmd", "info");
-        String response = writeLineAndRead(configuredPortName, baudRate, command.toString());
+        JsonObject command = buildInfoCommand();
+        String response = queryCommand(configuredPortName, baudRate, command.toString());
         if (response == null || response.isBlank()) {
             return null;
         }
@@ -53,6 +58,12 @@ final class SerialShockTransport {
         return ports;
     }
 
+    private static JsonObject buildInfoCommand() {
+        JsonObject command = new JsonObject();
+        command.addProperty("cmd", CMD_INFO);
+        return command;
+    }
+
     private static JsonObject buildOperateCommand(int shockerId, PiShock.PiShockMode mode, int intensity, int durationMs) {
         JsonObject value = new JsonObject();
         value.addProperty("id", shockerId);
@@ -63,70 +74,87 @@ final class SerialShockTransport {
         }
 
         JsonObject command = new JsonObject();
-        command.addProperty("cmd", "operate");
+        command.addProperty("cmd", CMD_OPERATE);
         command.add("value", value);
         return command;
     }
 
-    private static boolean writeLine(String configuredPortName, int baudRate, String json) {
-        SerialPort port = findPort(configuredPortName);
+    private static boolean sendCommand(String configuredPortName, int baudRate, String json) {
+        SerialPort port = openPort(configuredPortName, baudRate, SerialPort.TIMEOUT_WRITE_BLOCKING);
         if (port == null) {
             return false;
         }
 
-        byte[] payload = (json + "\n").getBytes(StandardCharsets.UTF_8);
-        port.setComPortParameters(baudRate, 8, SerialPort.ONE_STOP_BIT, SerialPort.NO_PARITY);
-        port.setComPortTimeouts(SerialPort.TIMEOUT_WRITE_BLOCKING, 0, WRITE_TIMEOUT_MS);
-
         try {
-            if (!port.openPort()) {
-                return false;
-            }
-            return port.writeBytes(payload, payload.length) == payload.length;
+            return writeJsonLine(port, json);
         } finally {
-            if (port.isOpen()) {
-                port.closePort();
-            }
+            closeQuietly(port);
         }
     }
 
-    private static String writeLineAndRead(String configuredPortName, int baudRate, String json) {
+    private static String queryCommand(String configuredPortName, int baudRate, String json) {
+        SerialPort port = openPort(
+                configuredPortName,
+                baudRate,
+                SerialPort.TIMEOUT_READ_SEMI_BLOCKING | SerialPort.TIMEOUT_WRITE_BLOCKING
+        );
+        if (port == null) {
+            return null;
+        }
+
+        try {
+            // Old terminal output can sit in the buffer after connect; don't parse that as today's reply.
+            port.flushIOBuffers();
+            return writeJsonLine(port, json) ? readUntilTerminalInfo(port) : null;
+        } finally {
+            closeQuietly(port);
+        }
+    }
+
+    private static SerialPort openPort(String configuredPortName, int baudRate, int timeoutMode) {
         SerialPort port = findPort(configuredPortName);
         if (port == null) {
             return null;
         }
 
-        byte[] payload = (json + "\n").getBytes(StandardCharsets.UTF_8);
-        port.setComPortParameters(baudRate, 8, SerialPort.ONE_STOP_BIT, SerialPort.NO_PARITY);
-        port.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING | SerialPort.TIMEOUT_WRITE_BLOCKING, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS);
+        configurePort(port, baudRate, timeoutMode);
+        return port.openPort() ? port : null;
+    }
 
-        try {
-            if (!port.openPort()) {
-                return null;
-            }
-            port.flushIOBuffers();
-            if (port.writeBytes(payload, payload.length) != payload.length) {
-                return null;
+    private static void configurePort(SerialPort port, int baudRate, int timeoutMode) {
+        port.setComPortParameters(baudRate, DATA_BITS, SerialPort.ONE_STOP_BIT, SerialPort.NO_PARITY);
+        port.setComPortTimeouts(timeoutMode, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS);
+    }
+
+    private static boolean writeJsonLine(SerialPort port, String json) {
+        byte[] payload = (json + LINE_ENDING).getBytes(StandardCharsets.UTF_8);
+        return port.writeBytes(payload, payload.length) == payload.length;
+    }
+
+    private static String readUntilTerminalInfo(SerialPort port) {
+        long deadline = System.currentTimeMillis() + READ_TIMEOUT_MS;
+        StringBuilder response = new StringBuilder();
+        byte[] buffer = new byte[READ_BUFFER_SIZE];
+
+        while (System.currentTimeMillis() < deadline) {
+            int bytesRead = port.readBytes(buffer, buffer.length);
+            if (bytesRead <= 0) {
+                continue;
             }
 
-            long deadline = System.currentTimeMillis() + READ_TIMEOUT_MS;
-            StringBuilder response = new StringBuilder();
-            byte[] buffer = new byte[256];
-            while (System.currentTimeMillis() < deadline) {
-                int bytesRead = port.readBytes(buffer, buffer.length);
-                if (bytesRead > 0) {
-                    response.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
-                    int terminalInfoIndex = response.indexOf(TERMINAL_INFO_PREFIX);
-                    if (terminalInfoIndex >= 0 && response.indexOf("\n", terminalInfoIndex) > terminalInfoIndex) {
-                        break;
-                    }
-                }
+            response.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
+            int terminalInfoIndex = response.indexOf(TERMINAL_INFO_PREFIX);
+            if (terminalInfoIndex >= 0 && response.indexOf(LINE_ENDING, terminalInfoIndex) > terminalInfoIndex) {
+                break;
             }
-            return response.toString();
-        } finally {
-            if (port.isOpen()) {
-                port.closePort();
-            }
+        }
+
+        return response.toString();
+    }
+
+    private static void closeQuietly(SerialPort port) {
+        if (port.isOpen()) {
+            port.closePort();
         }
     }
 
@@ -143,6 +171,7 @@ final class SerialShockTransport {
             return SerialPort.getCommPort(trimmedPortName);
         }
 
+        // Auto-detect only when there is exactly one matching hub.
         List<SerialPort> matches = new ArrayList<>();
         for (SerialPort port : ports) {
             if (isPiShockPort(port)) {
@@ -166,40 +195,52 @@ final class SerialShockTransport {
     }
 
     private static Info parseInfo(String response) {
+        String json = extractTerminalInfoJson(response);
+        if (json == null) {
+            return null;
+        }
+
+        try {
+            JsonObject object = JsonParser.parseString(json).getAsJsonObject();
+            String version = getString(object, "version");
+            Integer type = firstPresentInt(object, "type", "Type");
+            Integer clientId = firstPresentInt(object, "clientId", "clientID", "HubId", "hubId");
+            return new Info(version, type, clientId, parseShockers(object));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String extractTerminalInfoJson(String response) {
         int prefixIndex = response.indexOf(TERMINAL_INFO_PREFIX);
         if (prefixIndex < 0) {
             return null;
         }
 
-        String json = response.substring(prefixIndex + TERMINAL_INFO_PREFIX.length()).trim();
-        int start = json.indexOf('{');
-        int end = json.lastIndexOf('}');
-        if (start < 0 || end <= start) {
-            return null;
+        String tail = response.substring(prefixIndex + TERMINAL_INFO_PREFIX.length()).trim();
+        int start = tail.indexOf('{');
+        int end = tail.lastIndexOf('}');
+        return start >= 0 && end > start ? tail.substring(start, end + 1) : null;
+    }
+
+    private static List<ShockerInfo> parseShockers(JsonObject object) {
+        List<ShockerInfo> shockers = new ArrayList<>();
+        if (!object.has("shockers") || !object.get("shockers").isJsonArray()) {
+            return shockers;
         }
 
-        try {
-            JsonObject object = com.google.gson.JsonParser.parseString(json.substring(start, end + 1)).getAsJsonObject();
-            String version = getString(object, "version");
-            Integer type = firstPresentInt(object, "type", "Type");
-            Integer clientId = firstPresentInt(object, "clientId", "clientID", "HubId", "hubId");
-            List<ShockerInfo> shockers = new ArrayList<>();
-            if (object.has("shockers") && object.get("shockers").isJsonArray()) {
-                for (var element : object.getAsJsonArray("shockers")) {
-                    if (!element.isJsonObject()) {
-                        continue;
-                    }
-                    JsonObject shocker = element.getAsJsonObject();
-                    Integer id = firstPresentInt(shocker, "id", "shockerId", "ShockerId");
-                    if (id != null) {
-                        shockers.add(new ShockerInfo(id, getBoolean(shocker, "paused")));
-                    }
-                }
+        for (var element : object.getAsJsonArray("shockers")) {
+            if (!element.isJsonObject()) {
+                continue;
             }
-            return new Info(version, type, clientId, shockers);
-        } catch (Exception ignored) {
-            return null;
+
+            JsonObject shocker = element.getAsJsonObject();
+            Integer id = firstPresentInt(shocker, "id", "shockerId", "ShockerId");
+            if (id != null) {
+                shockers.add(new ShockerInfo(id, getBoolean(shocker, "paused")));
+            }
         }
+        return shockers;
     }
 
     private static Integer firstPresentInt(JsonObject object, String... keys) {
