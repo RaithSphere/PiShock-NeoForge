@@ -186,12 +186,12 @@ public class PiShock {
         int clampedIntensity = Math.max(1, Math.min(100, intensity));
         int clampedDurationMs = Math.max(100, Math.min(15000, durationMs));
 
-        if (!PiShockConfig.PISHOCK_QUEUE_ENABLED.get()) {
-            ShockHandler.shock(clampedIntensity, clampedDurationMs);
-            return;
-        }
-
         synchronized (SHOCK_QUEUE) {
+            // "Queue disabled" still goes through the worker so damage ticks never block on API calls.
+            if (!PiShockConfig.PISHOCK_QUEUE_ENABLED.get() && !SHOCK_QUEUE.isEmpty()) {
+                return;
+            }
+
             int maxSize = PiShockConfig.PISHOCK_QUEUE_MAX_SIZE.get();
             while (SHOCK_QUEUE.size() >= maxSize) {
                 SHOCK_QUEUE.poll();
