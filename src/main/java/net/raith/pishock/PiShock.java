@@ -1,18 +1,11 @@
 package net.raith.pishock;
 
 import com.mojang.logging.LogUtils;
-import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.client.gui.components.ImageButton;
-import net.minecraft.client.gui.components.WidgetSprites;
-import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.screens.PauseScreen;
-import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.commands.Commands;
 import net.neoforged.api.distmarker.Dist;
@@ -27,7 +20,6 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.event.PlayerHeartTypeEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
@@ -35,10 +27,10 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.raith.pishock.client.PiShockClothConfigScreen;
+import net.raith.pishock.client.PiShockCompat;
 import net.raith.pishock.network.ShockCore;
 import net.raith.pishock.network.ShockHandler;
 import org.slf4j.Logger;
-import org.lwjgl.glfw.GLFW;
 
 import javax.annotation.Nullable;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -50,16 +42,9 @@ public class PiShock {
 
     public static final String MOD_ID = "pishock";
     public static final Logger LOGGER = LogUtils.getLogger();
-    private static final Identifier MAIN_MENU_ICON = Identifier.fromNamespaceAndPath(MOD_ID, "pishock_setup");
-    private static final KeyMapping.Category KEY_CATEGORY = KeyMapping.Category.register(
-            Identifier.fromNamespaceAndPath(MOD_ID, "controls")
-    );
-    private static final KeyMapping TOGGLE_KEY = new KeyMapping(
-            "key.pishock.toggle_enabled",
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_F12,
-            KEY_CATEGORY
-    );
+    // Minecraft and NeoForge moved a few client APIs between 1.21.x releases.
+    // PiShockCompat keeps those details out of the common mod code.
+    private static final KeyMapping TOGGLE_KEY = PiShockCompat.createToggleKey();
     private static ModContainer MOD_CONTAINER;
 
     @Nullable
@@ -263,7 +248,7 @@ public class PiShock {
         SHOCK_VISUAL_UNTIL_MS.accumulateAndGet(now + clampedDurationMs, Math::max);
     }
 
-    private static boolean isShockVisualActive() {
+    public static boolean isShockVisualActive() {
         return System.currentTimeMillis() < SHOCK_VISUAL_UNTIL_MS.get();
     }
 
@@ -357,60 +342,8 @@ public class PiShock {
         }
 
         @SubscribeEvent
-        public static void onPlayerHeartType(PlayerHeartTypeEvent event) {
-            Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.player == null || event.getEntity() != minecraft.player) {
-                return;
-            }
-            if (!PiShockConfig.PISHOCK_ENABLED.get()) {
-                return;
-            }
-            if (isShockVisualActive()) {
-                event.setType(Gui.HeartType.FROZEN);
-            }
-        }
-
-        @SubscribeEvent
         public static void onScreenInit(ScreenEvent.Init.Post event) {
-            PiShockClothConfigScreen.onScreenInit(event);
-
-            if (event.getScreen() instanceof TitleScreen titleScreen) {
-                int buttonSize = 20;
-                int x = titleScreen.width - buttonSize - 6;
-                int y = 6;
-
-                event.addListener(new ImageButton(
-                        x,
-                        y,
-                        buttonSize,
-                        buttonSize,
-                        new WidgetSprites(MAIN_MENU_ICON, MAIN_MENU_ICON),
-                        button -> {
-                            Minecraft minecraft = Minecraft.getInstance();
-                            minecraft.setScreen(PiShockClothConfigScreen.create(titleScreen));
-                        },
-                        Component.literal("PiShock Setup")
-                ));
-            }
-
-            if (event.getScreen() instanceof PauseScreen pauseScreen) {
-                int buttonSize = 20;
-                int x = pauseScreen.width - buttonSize - 6;
-                int y = 6;
-
-                event.addListener(new ImageButton(
-                        x,
-                        y,
-                        buttonSize,
-                        buttonSize,
-                        new WidgetSprites(MAIN_MENU_ICON, MAIN_MENU_ICON),
-                        button -> {
-                            Minecraft minecraft = Minecraft.getInstance();
-                            minecraft.setScreen(PiShockClothConfigScreen.create(pauseScreen));
-                        },
-                        Component.literal("PiShock Setup")
-                ));
-            }
+            PiShockCompat.onScreenInit(event);
         }
 
         @SubscribeEvent

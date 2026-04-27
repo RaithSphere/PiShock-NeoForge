@@ -101,6 +101,20 @@ if (shouldAutoBumpVersion) {
 version = activeModVersion
 group = mod_group_id
 
+def minecraftSourceDirs = [
+        '1.21.1' : 'src/mc-1.21.1/java',
+        '1.21.10': 'src/mc-1.21.10/java',
+        '1.21.11': 'src/mc-1.21.11/java'
+]
+def minecraftSourceDir = minecraftSourceDirs[minecraft_version]
+if (minecraftSourceDir == null) {
+    throw new GradleException("No Minecraft-specific source directory configured for ${minecraft_version}")
+}
+
+// These source folders are our Java-friendly version of #if MC_1_21_10.
+// Only one PiShockCompat implementation is compiled for the selected Minecraft version.
+sourceSets.main.java.srcDir minecraftSourceDir
+
 tasks.register('bumpModVersion') {
     group = 'Raith'
     description = 'Updates mod_version in gradle.properties using the YY.MM.DD.X pattern.'
@@ -180,6 +194,133 @@ tasks.register('testClient') {
     description = 'Launches the NeoForge client run configuration.'
     dependsOn 'runClient'
 }
+
+def minecraftVersionsTaskGroup = 'Raith Minecraft Versions'
+def minecraftVersions = ['1.21.1', '1.21.10', '1.21.11']
+
+def readMinecraftVersionProperties = { String mcVersion ->
+    def propsFile = file("src/mc-${mcVersion}/gradle.properties")
+    if (!propsFile.exists()) {
+        throw new GradleException("Missing Minecraft version properties: ${propsFile}")
+    }
+
+    def props = new Properties()
+    propsFile.withInputStream { props.load(it) }
+    props
+}
+
+def updateMinecraftVersionProperties = { String mcVersion ->
+    def props = readMinecraftVersionProperties(mcVersion)
+    def lines = modPropertiesFile.readLines('UTF-8')
+
+    props.each { key, value ->
+        def found = false
+        lines = lines.collect { line ->
+            if (line ==~ /^${java.util.regex.Pattern.quote(key as String)}=.*/) {
+                found = true
+                return "${key}=${value}"
+            }
+            line
+        }
+        if (!found) {
+            lines.add("${key}=${value}")
+        }
+    }
+
+    modPropertiesFile.setText(lines.join(System.lineSeparator()) + System.lineSeparator(), 'UTF-8')
+    logger.lifecycle("Using Minecraft ${mcVersion} / NeoForge ${props.neo_version} / Cloth Config ${props.cloth_config_version}")
+}
+
+def gradleWrapperCommand = {
+    System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+            ? file('gradlew.bat').absolutePath
+            : file('gradlew').absolutePath
+}
+
+def registerMinecraftToolTask = { String taskName, String mcVersion, String scriptTask ->
+    tasks.register(taskName, Exec) {
+        group = minecraftVersionsTaskGroup
+        description = "${scriptTask.capitalize()}s PiShock for Minecraft ${mcVersion}."
+        workingDir projectDir
+        notCompatibleWithConfigurationCache('Switches Minecraft properties before launching a nested Gradle build.')
+
+        doFirst {
+            updateMinecraftVersionProperties(mcVersion)
+            def gradleTask = scriptTask == 'release' ? 'buildNewRelease' : scriptTask
+            commandLine gradleWrapperCommand(), gradleTask
+        }
+    }
+}
+
+minecraftVersions.each { mcVersion ->
+    def suffix = mcVersion.replace('.', '_')
+
+    tasks.register("switchToMinecraft${suffix}") {
+        group = minecraftVersionsTaskGroup
+        description = "Switches the project to Minecraft ${mcVersion}."
+        notCompatibleWithConfigurationCache('Edits gradle.properties for the selected Minecraft version.')
+
+        doLast {
+            updateMinecraftVersionProperties(mcVersion)
+        }
+    }
+
+    registerMinecraftToolTask("testMinecraft${suffix}", mcVersion, 'test')
+    registerMinecraftToolTask("buildMinecraft${suffix}", mcVersion, 'build')
+
+    tasks.register("releaseMinecraft${suffix}", Exec) {
+        group = minecraftVersionsTaskGroup
+        description = "Builds a release jar for Minecraft ${mcVersion}."
+        workingDir projectDir
+        notCompatibleWithConfigurationCache('Switches Minecraft properties before launching a nested Gradle build.')
+
+        doFirst {
+            updateMinecraftVersionProperties(mcVersion)
+            commandLine gradleWrapperCommand(), 'buildNewRelease'
+        }
+    }
+}
+
+def registerAllMinecraftVersionsTask = { String taskName, String gradleTask, String taskDescription ->
+    tasks.register(taskName) {
+        group = minecraftVersionsTaskGroup
+        description = taskDescription
+        notCompatibleWithConfigurationCache('Runs nested Gradle builds for multiple Minecraft versions.')
+
+        doLast {
+            def originalProperties = modPropertiesFile.getText('UTF-8')
+            try {
+                minecraftVersions.each { mcVersion ->
+                    updateMinecraftVersionProperties(mcVersion)
+                    exec {
+                        workingDir projectDir
+                        commandLine gradleWrapperCommand(), gradleTask
+                    }
+                }
+            } finally {
+                modPropertiesFile.setText(originalProperties, 'UTF-8')
+            }
+        }
+    }
+}
+
+registerAllMinecraftVersionsTask(
+        'testAllMinecraftVersions',
+        'test',
+        'Runs tests for Minecraft 1.21.1, 1.21.10, and 1.21.11, then restores gradle.properties.'
+)
+
+registerAllMinecraftVersionsTask(
+        'buildAllMinecraftVersions',
+        'build',
+        'Builds Minecraft 1.21.1, 1.21.10, and 1.21.11, then restores gradle.properties.'
+)
+
+registerAllMinecraftVersionsTask(
+        'releaseAllMinecraftVersions',
+        'buildNewRelease',
+        'Builds release jars for Minecraft 1.21.1, 1.21.10, and 1.21.11, then restores gradle.properties.'
+)
 
 repositories {
     mavenLocal()
@@ -283,7 +424,7 @@ configurations {
 
 dependencies {
     def jSerialCommDependency = "com.fazecast:jSerialComm:2.11.4"
-    implementation "me.shedaniel.cloth:cloth-config-neoforge:21.11.153"
+    implementation "me.shedaniel.cloth:cloth-config-neoforge:${cloth_config_version}"
     implementation jSerialCommDependency
     clientAdditionalRuntimeClasspath jSerialCommDependency
     jarJar jSerialCommDependency

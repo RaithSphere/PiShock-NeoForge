@@ -97,7 +97,7 @@ Disclaimer: The authors of this mod are not responsible for any harm caused by t
 [[dependencies.${mod_id}]]
     modId="cloth_config"
     type="required"
-    versionRange="[21.11.153,)"
+    versionRange="[15.0.140,21.11.153,)"
     ordering="NONE"
     side="CLIENT"
 
