@@ -9,7 +9,6 @@ import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import me.shedaniel.clothconfig2.gui.entries.IntegerListEntry;
 import me.shedaniel.clothconfig2.gui.entries.SelectionListEntry;
-import me.shedaniel.clothconfig2.gui.entries.StringListListEntry;
 import me.shedaniel.clothconfig2.gui.entries.StringListEntry;
 import me.shedaniel.clothconfig2.gui.entries.TextListEntry;
 import net.minecraft.client.Minecraft;
@@ -58,6 +57,7 @@ public final class PiShockClothConfigScreen {
     }
 
     private static Screen create(Screen parent, boolean openApiFirst, boolean openSerialFirst) {
+        String initialShockerId = PiShockConfig.PISHOCK_SHOCKER_ID.get();
         ConfigBuilder builder = ConfigBuilder.create()
                 .setParentScreen(parent)
                 .setTitle(Component.literal("PiShock Setup"));
@@ -67,55 +67,47 @@ public final class PiShockClothConfigScreen {
         ConfigCategory api;
         ConfigCategory serial;
         if (openApiFirst) {
+            api = builder.getOrCreateCategory(Component.literal("API"));
+            behavior = builder.getOrCreateCategory(Component.literal("Behavior"));
+            serial = builder.getOrCreateCategory(Component.literal("Serial"));
+        } else if (openSerialFirst) {
+            serial = builder.getOrCreateCategory(Component.literal("Serial"));
             behavior = builder.getOrCreateCategory(Component.literal("Behavior"));
             api = builder.getOrCreateCategory(Component.literal("API"));
-            serial = builder.getOrCreateCategory(Component.literal("Serial"));
         } else {
             behavior = builder.getOrCreateCategory(Component.literal("Behavior"));
             api = builder.getOrCreateCategory(Component.literal("API"));
             serial = builder.getOrCreateCategory(Component.literal("Serial"));
         }
-        api.addEntry(entryBuilder.startTextDescription(Component.literal(
+        TextListEntry fetchDescriptionEntry = entryBuilder.startTextDescription(Component.literal(
                         "Click Fetch IDs to populate User ID, Hub ID, and Shocker ID from your PiShock account."))
-                .build());
+                .build();
 
         StringListEntry usernameEntry = entryBuilder.startStrField(Component.literal("Username"), PiShockConfig.PISHOCK_USERNAME.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_USERNAME::set)
                 .build();
-        api.addEntry(usernameEntry);
 
         StringListEntry apiKeyEntry = entryBuilder.startStrField(Component.literal("API Key"), PiShockConfig.PISHOCK_APIKEY.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_APIKEY::set)
                 .build();
-        api.addEntry(apiKeyEntry);
 
         StringListEntry userIdEntry = entryBuilder.startStrField(Component.literal("User ID (-1 = Auto)"), Integer.toString(PiShockConfig.PISHOCK_USER_ID.get()))
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_USER_ID.set(parseIntOrDefault(value, -1)))
                 .build();
-        api.addEntry(userIdEntry);
 
         StringListEntry hubIdEntry = entryBuilder.startStrField(Component.literal("Hub ID (-1 = Auto)"), Integer.toString(PiShockConfig.PISHOCK_HUB_ID.get()))
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_HUB_ID.set(parseIntOrDefault(value, -1)))
                 .build();
-        api.addEntry(hubIdEntry);
 
-        StringListEntry shockerIdEntry = entryBuilder.startStrField(Component.literal("Shocker ID (blank = Auto)"), PiShockConfig.PISHOCK_SHOCKER_ID.get())
+        StringListEntry shockerIdEntry = entryBuilder.startStrField(Component.literal("Shocker ID (blank = Auto)"), initialShockerId)
                 .setSaveConsumer(PiShockConfig.PISHOCK_SHOCKER_ID::set)
                 .build();
-        api.addEntry(shockerIdEntry);
 
-        StringListListEntry hubShockerListEntry = entryBuilder
-                .startStrList(Component.literal("Hub -> Shockers"), toHubShockerDisplayList(CACHED_DEVICE_ROUTES))
-                .setSaveConsumer(value -> {
-                    // Display list only; selection is done through Hub ID + Shocker ID fields.
-                })
-                .setExpanded(true)
-                .build();
-        api.addEntry(hubShockerListEntry);
+        TextListEntry hubShockerListEntry = new HubShockerRoutesEntry(() -> toHubShockerDisplayList(CACHED_DEVICE_ROUTES));
 
-        api.addEntry(entryBuilder.startStrField(Component.literal("Log Identifier"), PiShockConfig.PISHOCK_LOG_IDENTIFIER.get())
+        StringListEntry logIdentifierEntry = entryBuilder.startStrField(Component.literal("Log Identifier"), PiShockConfig.PISHOCK_LOG_IDENTIFIER.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_LOG_IDENTIFIER::set)
-                .build());
+                .build();
         behavior.addEntry(entryBuilder.startBooleanToggle(Component.literal("Enabled"), PiShockConfig.PISHOCK_ENABLED.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_ENABLED::set)
                 .build());
@@ -163,9 +155,21 @@ public final class PiShockClothConfigScreen {
         IntegerListEntry serialBaudEntry = entryBuilder.startIntField(Component.translatable("pishock.configuration.serial.baud"), PiShockConfig.PISHOCK_SERIAL_BAUD.get())
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_SERIAL_BAUD.set(clamp(value, 1200, 921600)))
                 .build();
-        StringListEntry serialShockerIdEntry = entryBuilder.startStrField(Component.translatable("pishock.configuration.serial.shocker_id"), PiShockConfig.PISHOCK_SHOCKER_ID.get())
+        StringListEntry serialShockerIdEntry = entryBuilder.startStrField(Component.translatable("pishock.configuration.serial.shocker_id"), initialShockerId)
                 .setSaveConsumer(PiShockConfig.PISHOCK_SHOCKER_ID::set)
                 .build();
+        FetchContext fetchContext = new FetchContext(parent, usernameEntry, apiKeyEntry, userIdEntry, hubIdEntry, shockerIdEntry, serialShockerIdEntry);
+
+        api.addEntry(fetchDescriptionEntry);
+        api.addEntry(new ApiControlsEntry(button -> fetchIds(button, fetchContext)));
+        api.addEntry(usernameEntry);
+        api.addEntry(apiKeyEntry);
+        api.addEntry(userIdEntry);
+        api.addEntry(hubIdEntry);
+        api.addEntry(shockerIdEntry);
+        api.addEntry(hubShockerListEntry);
+        api.addEntry(logIdentifierEntry);
+
         SerialContext serialContext = new SerialContext(parent, usernameEntry, apiKeyEntry, userIdEntry, hubIdEntry, shockerIdEntry, serialShockerIdEntry, serialPortEntry, serialBaudEntry);
         serial.addEntry(new SerialControlsEntry(
                 queryButton -> runSerialConnect(queryButton, serialContext),
@@ -181,12 +185,35 @@ public final class PiShockClothConfigScreen {
 
         builder.setAfterInitConsumer(screen -> {
             synchronized (FETCH_CONTEXTS) {
-                FETCH_CONTEXTS.put(screen, new FetchContext(parent, usernameEntry, apiKeyEntry, userIdEntry, hubIdEntry, shockerIdEntry));
+                FETCH_CONTEXTS.put(screen, fetchContext);
             }
         });
 
-        builder.setSavingRunnable(PiShockConfig::save);
+        builder.setSavingRunnable(() -> {
+            PiShockConfig.PISHOCK_SHOCKER_ID.set(resolveShockerIdValue(
+                    initialShockerId,
+                    shockerIdEntry.getValue(),
+                    serialShockerIdEntry.getValue()
+            ));
+            PiShockConfig.save();
+        });
         return builder.build();
+    }
+
+    private static String resolveShockerIdValue(String initialValue, String apiValue, String serialValue) {
+        String initial = trimConfigString(initialValue);
+        String api = trimConfigString(apiValue);
+        String serial = trimConfigString(serialValue);
+        boolean apiChanged = !api.equals(initial);
+        boolean serialChanged = !serial.equals(initial);
+
+        if (apiChanged && !serialChanged) {
+            return api;
+        }
+        if (serialChanged) {
+            return serial;
+        }
+        return api;
     }
 
     public static void onScreenInit(ScreenEvent.Init.Post event) {
@@ -199,24 +226,18 @@ public final class PiShockClothConfigScreen {
         }
 
         int buttonHeight = 18;
-        int fetchWidth = 108;
         int smallWidth = 52;
         int gap = 4;
-        int x = event.getScreen().width - Math.max(fetchWidth, (smallWidth * 2) + gap) - 8;
+        int x = event.getScreen().width - ((smallWidth * 2) + gap) - 8;
         int y = 8;
 
-        Button fetchButton = Button.builder(Component.literal("Fetch IDs"), button -> fetchIds(button, context))
-                .bounds(x, y, fetchWidth, buttonHeight)
-                .build();
-        event.addListener(fetchButton);
-
         Button checkButton = Button.builder(Component.literal("Check"), PiShockClothConfigScreen::runConnectivityCheck)
-                .bounds(x, y + buttonHeight + 4, smallWidth, buttonHeight)
+                .bounds(x, y, smallWidth, buttonHeight)
                 .build();
         event.addListener(checkButton);
 
         Button testVibrationButton = Button.builder(Component.literal("Test"), PiShockClothConfigScreen::runVibrationTest)
-                .bounds(x + smallWidth + gap, y + buttonHeight + 4, smallWidth, buttonHeight)
+                .bounds(x + smallWidth + gap, y, smallWidth, buttonHeight)
                 .build();
         event.addListener(testVibrationButton);
     }
@@ -265,6 +286,7 @@ public final class PiShockClothConfigScreen {
                             DevicePair preferred = choosePreferredRoute(result.devices, context.hubIdEntry.getValue(), context.shockerIdEntry.getValue());
                             context.hubIdEntry.setValue(Integer.toString(preferred.hubId));
                             context.shockerIdEntry.setValue(Integer.toString(preferred.shockerId));
+                            context.serialShockerIdEntry.setValue(Integer.toString(preferred.shockerId));
                             PiShockConfig.PISHOCK_HUB_ID.set(preferred.hubId);
                             PiShockConfig.PISHOCK_SHOCKER_ID.set(Integer.toString(preferred.shockerId));
                             logFetch("Fetch IDs success. userId=" + result.userId + ", routes=" + result.devices.size()
@@ -275,7 +297,6 @@ public final class PiShockClothConfigScreen {
 
                         PiShockConfig.save();
                         button.setMessage(Component.literal("Fetched"));
-                        minecraft.setScreen(create(context.parentScreen, true));
                     });
                 });
     }
@@ -575,6 +596,10 @@ public final class PiShockClothConfigScreen {
         }
     }
 
+    private static String trimConfigString(String value) {
+        return value == null ? "" : value.trim();
+    }
+
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
@@ -721,6 +746,89 @@ public final class PiShockClothConfigScreen {
         }
     }
 
+    private static final class HubShockerRoutesEntry extends TextListEntry {
+        private static final int TEXT_PADDING = 6;
+        private static final int LINE_GAP = 4;
+        private static final int MIN_HEIGHT = 28;
+        private final Component label = Component.literal("Hub -> Shockers");
+        private final Supplier<List<String>> routesSupplier;
+
+        private HubShockerRoutesEntry(Supplier<List<String>> routesSupplier) {
+            super(Component.literal("Hub -> Shockers"), Component.empty());
+            this.routesSupplier = routesSupplier;
+        }
+
+        @Override
+        public void render(GuiGraphics graphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float delta) {
+            var font = Minecraft.getInstance().font;
+            List<String> routes = routesSupplier.get();
+            int textColor = getPreferredTextColor();
+            int lineHeight = font.lineHeight + LINE_GAP;
+            graphics.drawString(font, label, x + TEXT_PADDING, y + TEXT_PADDING, textColor);
+
+            int valueX = x + TEXT_PADDING;
+            int valueY = y + TEXT_PADDING + lineHeight;
+            if (routes == null || routes.isEmpty()) {
+                graphics.drawString(font, Component.literal("-"), valueX, valueY, textColor);
+                return;
+            }
+
+            for (String route : routes) {
+                graphics.drawString(font, Component.literal(route), valueX, valueY, textColor);
+                valueY += lineHeight;
+            }
+        }
+
+        @Override
+        public int getItemHeight() {
+            List<String> routes = routesSupplier.get();
+            int lineCount = 1 + Math.max(1, routes == null ? 0 : routes.size());
+            return Math.max(MIN_HEIGHT, (Minecraft.getInstance().font.lineHeight + LINE_GAP) * lineCount + TEXT_PADDING);
+        }
+    }
+
+    private static final class ApiControlsEntry extends TextListEntry {
+        private static final int TEXT_PADDING = 6;
+        private static final int BUTTON_WIDTH = 108;
+        private static final int BUTTON_HEIGHT = 20;
+        private static final int ENTRY_HEIGHT = 28;
+        private final Component label = Component.literal("Account");
+        private final Button fetchButton;
+
+        private ApiControlsEntry(Consumer<Button> onFetch) {
+            super(Component.literal("Account"), Component.empty());
+            this.fetchButton = Button.builder(Component.literal("Fetch IDs"), onFetch::accept)
+                    .bounds(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
+                    .build();
+        }
+
+        @Override
+        public void render(GuiGraphics graphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float delta) {
+            var font = Minecraft.getInstance().font;
+            int textY = y + (entryHeight - font.lineHeight) / 2;
+            graphics.drawString(font, label, x + TEXT_PADDING, textY, getPreferredTextColor());
+            int buttonY = y + (entryHeight - BUTTON_HEIGHT) / 2;
+            fetchButton.setX(x + entryWidth - BUTTON_WIDTH - TEXT_PADDING);
+            fetchButton.setY(buttonY);
+            fetchButton.render(graphics, mouseX, mouseY, delta);
+        }
+
+        @Override
+        public int getItemHeight() {
+            return ENTRY_HEIGHT;
+        }
+
+        @Override
+        public List<? extends GuiEventListener> children() {
+            return List.of(fetchButton);
+        }
+
+        @Override
+        public List<? extends NarratableEntry> narratables() {
+            return List.of(fetchButton);
+        }
+    }
+
     private static final class SerialControlsEntry extends TextListEntry {
         private static final int TEXT_PADDING = 6;
         private static final int BUTTON_WIDTH = 72;
@@ -778,7 +886,8 @@ public final class PiShockClothConfigScreen {
             StringListEntry apiKeyEntry,
             StringListEntry userIdEntry,
             StringListEntry hubIdEntry,
-            StringListEntry shockerIdEntry
+            StringListEntry shockerIdEntry,
+            StringListEntry serialShockerIdEntry
     ) {
     }
 
