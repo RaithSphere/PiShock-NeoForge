@@ -29,6 +29,14 @@ class ShockCoreTest {
     }
 
     @Test
+    void enforceOperationLimitsClampsMisconfiguredLimitsBeforeApplyingThem() {
+        ShockCore.OperationLimits limits = ShockCore.enforceOperationLimits(80, 2000, true, -10, 50);
+
+        assertEquals(ShockCore.HARD_MIN_INTENSITY, limits.intensity());
+        assertEquals(ShockCore.HARD_MIN_DURATION_MS, limits.durationMs());
+    }
+
+    @Test
     void computeIntensityFromDamageRatioScalesAndClamps() {
         assertEquals(20, ShockCore.computeIntensityFromDamageRatio(0.25F, 80));
         assertEquals(0, ShockCore.computeIntensityFromDamageRatio(-1.0F, 80));
@@ -56,6 +64,32 @@ class ShockCoreTest {
         ShockCore.DeviceRouting result = ShockCore.selectRouting(shockers, 7, 11);
 
         assertNull(result);
+    }
+
+    @Test
+    void selectRoutingAllowsFilteringByOnlyShockerId() {
+        JsonArray shockers = new JsonArray();
+        shockers.add(route(5, 9));
+        shockers.add(route(7, 11));
+
+        ShockCore.DeviceRouting result = ShockCore.selectRouting(shockers, null, 11);
+
+        assertNotNull(result);
+        assertEquals(7, result.hubId());
+        assertEquals(11, result.shockerId());
+    }
+
+    @Test
+    void selectRoutingAllowsFilteringByOnlyHubId() {
+        JsonArray shockers = new JsonArray();
+        shockers.add(route(5, 9));
+        shockers.add(route(7, 11));
+
+        ShockCore.DeviceRouting result = ShockCore.selectRouting(shockers, 7, null);
+
+        assertNotNull(result);
+        assertEquals(7, result.hubId());
+        assertEquals(11, result.shockerId());
     }
 
     @Test

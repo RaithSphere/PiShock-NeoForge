@@ -58,13 +58,13 @@ final class SerialShockTransport {
         return ports;
     }
 
-    private static JsonObject buildInfoCommand() {
+    static JsonObject buildInfoCommand() {
         JsonObject command = new JsonObject();
         command.addProperty("cmd", CMD_INFO);
         return command;
     }
 
-    private static JsonObject buildOperateCommand(int shockerId, PiShock.PiShockMode mode, int intensity, int durationMs) {
+    static JsonObject buildOperateCommand(int shockerId, PiShock.PiShockMode mode, int intensity, int durationMs) {
         JsonObject value = new JsonObject();
         value.addProperty("id", shockerId);
         value.addProperty("op", toSerialOperation(mode));
@@ -194,7 +194,7 @@ final class SerialShockTransport {
         };
     }
 
-    private static Info parseInfo(String response) {
+    static Info parseInfo(String response) {
         String json = extractTerminalInfoJson(response);
         if (json == null) {
             return null;

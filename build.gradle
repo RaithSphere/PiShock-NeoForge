@@ -458,6 +458,19 @@ dependencies {
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+    reports.html.required = true
+    reports.junitXml.required = true
+}
+
+tasks.register('allTestsHtmlReport', TestReport) {
+    group = 'verification'
+    description = 'Generates a combined HTML report for all Gradle test tasks.'
+    destinationDirectory = layout.buildDirectory.dir('reports/tests/all')
+    testResults.from(tasks.withType(Test).collect { it.binaryResultsDirectory })
+}
+
+tasks.named('test').configure {
+    finalizedBy tasks.named('allTestsHtmlReport')
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

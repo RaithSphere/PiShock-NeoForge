@@ -30,7 +30,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -200,20 +199,8 @@ public final class PiShockClothConfigScreen {
         return builder.build();
     }
 
-    private static String resolveShockerIdValue(String initialValue, String apiValue, String serialValue) {
-        String initial = trimConfigString(initialValue);
-        String api = trimConfigString(apiValue);
-        String serial = trimConfigString(serialValue);
-        boolean apiChanged = !api.equals(initial);
-        boolean serialChanged = !serial.equals(initial);
-
-        if (apiChanged && !serialChanged) {
-            return api;
-        }
-        if (serialChanged) {
-            return serial;
-        }
-        return api;
+    static String resolveShockerIdValue(String initialValue, String apiValue, String serialValue) {
+        return PiShockConfigLogic.resolveShockerIdValue(initialValue, apiValue, serialValue);
     }
 
     public static void onScreenInit(ScreenEvent.Init.Post event) {
@@ -596,8 +583,8 @@ public final class PiShockClothConfigScreen {
         }
     }
 
-    private static String trimConfigString(String value) {
-        return value == null ? "" : value.trim();
+    static String trimConfigString(String value) {
+        return PiShockConfigLogic.trimConfigString(value);
     }
 
     private static int clamp(int value, int min, int max) {
@@ -615,22 +602,10 @@ public final class PiShockClothConfigScreen {
         return routes.get(0);
     }
 
-    private static List<String> toHubShockerDisplayList(List<DevicePair> routes) {
-        LinkedHashMap<Integer, List<Integer>> grouped = new LinkedHashMap<>();
-        for (DevicePair route : routes) {
-            grouped.computeIfAbsent(route.hubId, ignored -> new ArrayList<>());
-            List<Integer> shockers = grouped.get(route.hubId);
-            if (!shockers.contains(route.shockerId)) {
-                shockers.add(route.shockerId);
-            }
-        }
-
-        List<String> lines = new ArrayList<>();
-        for (Map.Entry<Integer, List<Integer>> entry : grouped.entrySet()) {
-            String shockers = entry.getValue().stream().map(String::valueOf).reduce((a, b) -> a + ", " + b).orElse("");
-            lines.add("Hub " + entry.getKey() + " -> [" + shockers + "]");
-        }
-        return lines;
+    static List<String> toHubShockerDisplayList(List<DevicePair> routes) {
+        return PiShockConfigLogic.toHubShockerDisplayList(routes.stream()
+                .map(route -> new PiShockConfigLogic.DevicePair(route.hubId, route.shockerId))
+                .toList());
     }
 
     private static String[] serialPortOptions() {
@@ -680,7 +655,7 @@ public final class PiShockClothConfigScreen {
         return oneLine.substring(0, max) + "...(truncated)";
     }
 
-    private record DevicePair(int hubId, int shockerId) {
+    record DevicePair(int hubId, int shockerId) {
     }
 
     private record LookupResult(int userId, List<DevicePair> devices) {
