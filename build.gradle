@@ -79,6 +79,18 @@ tasks.register('unpackJSerialComm', Copy) {
 
 sourceSets.main.output.dir(unpackedSerialRuntime, builtBy: 'unpackJSerialComm')
 
+tasks.register('copyJSerialCommToClasses', Copy) {
+    dependsOn tasks.named('compileJava')
+    dependsOn tasks.named('unpackJSerialComm')
+    from unpackedSerialRuntime
+    into sourceSets.main.java.classesDirectory
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.named('classes').configure {
+    dependsOn tasks.named('copyJSerialCommToClasses')
+}
+
 repositories {
     mavenLocal()
     maven { url = 'https://maven.shedaniel.me/' }
