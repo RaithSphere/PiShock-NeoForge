@@ -1,154 +1,157 @@
 plugins {
-    id 'java-library'
+    id 'net.minecraftforge.gradle' version '5.1.77'
+    id 'java'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.107'
-    id 'me.hypherionmc.cursegradle' version '2.0.1'
     id 'idea'
 }
 
-tasks.named('wrapper', Wrapper).configure {
-    // Define wrapper values here so as to not have to always do so when updating gradlew.properties.
-    // Switching this to Wrapper.DistributionType.ALL will download the full gradle sources that comes with
-    // documentation attached on cursor hover of gradle classes and methods. However, this comes with increased
-    // file size for Gradle. If you do switch this to ALL, run the Gradle wrapper task twice afterwards.
-    // (Verify by checking gradle/wrapper/gradle-wrapper.properties to see if distributionUrl now points to `-all`)
-    distributionType = Wrapper.DistributionType.BIN
-}
-
-def modPropertiesFile = file('gradle.properties')
-def modVersionPattern = ~/^(\d{2})\.(\d{1,2})\.(\d{1,2})\.(\d+)$/
-
-def computeNextModVersion = { String currentVersion ->
-    def today = java.time.LocalDate.now()
-    def todayPrefix = today.format(java.time.format.DateTimeFormatter.ofPattern('yy.MM.dd'))
-    def matcher = currentVersion =~ modVersionPattern
-
-    if (matcher.matches()) {
-        def currentPrefix = String.format('%s.%02d.%02d',
-                matcher[0][1],
-                matcher[0][2] as int,
-                matcher[0][3] as int)
-        if (currentPrefix == todayPrefix) {
-            return "${todayPrefix}.${(matcher[0][4] as int) + 1}"
-        }
-    }
-
-    return "${todayPrefix}.1"
-}
-
-def computeReleaseModVersion = { String currentVersion ->
-    def today = java.time.LocalDate.now()
-    def todayPrefix = today.format(java.time.format.DateTimeFormatter.ofPattern('yy.MM.dd'))
-    def matcher = currentVersion =~ modVersionPattern
-
-    if (!matcher.matches()) {
-        return "${todayPrefix}.1"
-    }
-
-    def currentPrefix = String.format('%s.%02d.%02d',
-            matcher[0][1],
-            matcher[0][2] as int,
-            matcher[0][3] as int)
-    if (currentPrefix != todayPrefix) {
-        return "${todayPrefix}.1"
-    }
-
-    def releaseJarName = "pishock-${currentVersion}-${minecraft_version}-neoforge-${neo_version}.jar"
-    def releaseJarFile = file("E:/PiShock Mod Builds/${minecraft_version}/${releaseJarName}")
-    releaseJarFile.exists() ? computeNextModVersion(currentVersion) : currentVersion
-}
-
-def computeResetModVersion = {
-    def today = java.time.LocalDate.now()
-    "${today.format(java.time.format.DateTimeFormatter.ofPattern('yy.MM.dd'))}.1"
-}
-
-def updateModVersionProperty = { String newVersion ->
-    def updatedLines = modPropertiesFile.readLines('UTF-8').collect { line ->
-        line.startsWith('mod_version=') ? "mod_version=${newVersion}" : line
-    }
-    modPropertiesFile.setText(updatedLines.join(System.lineSeparator()) + System.lineSeparator(), 'UTF-8')
-}
-
-def curseForgeToken = providers.environmentVariable('CURSEFORGE_TOKEN')
-        .orElse(providers.gradleProperty('curseforge_token'))
-        .orElse('')
-
-def versionBumpTasks = [
-        'buildNewRelease',
-        'publishCurseForgeRelease',
-        'curseforge1520971',
-        'publish',
-        'publishAllPublicationsToMavenRepository',
-        'publishMavenJavaPublicationToMavenRepository'
-]
-def shouldAutoBumpVersion = (
-        !project.hasProperty('skipVersionBump')
-                && gradle.startParameter.taskNames.any { requestedTask ->
-            versionBumpTasks.any { bumpTask -> requestedTask == bumpTask || requestedTask.endsWith(":${bumpTask}") }
-        }
-)
-
-def activeModVersion = mod_version
-if (shouldAutoBumpVersion) {
-    activeModVersion = computeReleaseModVersion(mod_version)
-    if (activeModVersion != mod_version) {
-        updateModVersionProperty(activeModVersion)
-        logger.lifecycle("Updated mod_version from ${mod_version} to ${activeModVersion}")
-    }
-}
-
-version = activeModVersion
+version = mod_version
 group = mod_group_id
 
-def minecraftSourceDirs = [
-        '1.21.1' : 'src/mc-1.21.1/java',
-        '1.21.10': 'src/mc-1.21.10/java',
-        '1.21.11': 'src/mc-1.21.11/java'
-]
-def minecraftSourceDir = minecraftSourceDirs[minecraft_version]
-if (minecraftSourceDir == null) {
-    throw new GradleException("No Minecraft-specific source directory configured for ${minecraft_version}")
+base {
+    archivesName = mod_id
 }
 
-// These source folders are our Java-friendly version of #if MC_1_21_10.
-// Only one PiShockCompat implementation is compiled for the selected Minecraft version.
-sourceSets.main.java.srcDir minecraftSourceDir
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
-tasks.register('bumpModVersion') {
-    group = 'Raith'
-    description = 'Updates mod_version in gradle.properties using the YY.MM.DD.X pattern.'
+minecraft {
+    mappings channel: 'official', version: minecraft_version
 
-    doLast {
-        def currentVersion = modPropertiesFile.readLines('UTF-8')
-                .find { it.startsWith('mod_version=') }
-                ?.substring('mod_version='.length())
-        if (currentVersion == null) {
-            throw new GradleException('Could not find mod_version in gradle.properties')
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
         }
 
-        def newVersion = computeNextModVersion(currentVersion)
-        updateModVersionProperty(newVersion)
-        logger.lifecycle("Updated mod_version from ${currentVersion} to ${newVersion}")
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            args '--nogui'
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory project.file('run-data')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
     }
 }
 
-tasks.register('resetModVersion') {
-    group = 'Raith'
-    description = 'Resets mod_version to today with build number 1 using the YY.MM.DD.1 pattern.'
+sourceSets.main.resources { srcDir 'src/generated/resources' }
 
-    doLast {
-        def currentVersion = modPropertiesFile.readLines('UTF-8')
-                .find { it.startsWith('mod_version=') }
-                ?.substring('mod_version='.length())
-        if (currentVersion == null) {
-            throw new GradleException('Could not find mod_version in gradle.properties')
-        }
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
 
-        def newVersion = computeResetModVersion()
-        updateModVersionProperty(newVersion)
-        logger.lifecycle("Updated mod_version from ${currentVersion} to ${newVersion}")
+def unpackedSerialRuntime = layout.buildDirectory.dir('generated/serialRuntime')
+
+tasks.register('unpackJSerialComm', Copy) {
+    from {
+        project.configurations.shade.collect { it.isDirectory() ? it : zipTree(it) }
     }
+    into unpackedSerialRuntime
+    include 'com/fazecast/jSerialComm/**'
+    include 'Windows/**'
+    include 'Linux/**'
+    include 'Mac/**'
+    include 'FreeBSD/**'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+sourceSets.main.output.dir(unpackedSerialRuntime, builtBy: 'unpackJSerialComm')
+
+repositories {
+    mavenLocal()
+    maven { url = 'https://maven.shedaniel.me/' }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    implementation fg.deobf("me.shedaniel.cloth:cloth-config-forge:${cloth_config_version}")
+
+    shade "com.fazecast:jSerialComm:${jserialcomm_version}"
+    runtimeOnly "com.fazecast:jSerialComm:${jserialcomm_version}"
+    testImplementation "com.google.code.gson:gson:2.11.0"
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            forge_version          : forge_version,
+            forge_version_range    : forge_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            update_json_url        : update_json_url,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties
+    }
+}
+
+tasks.withType(Jar).configureEach {
+    archiveFileName = "pishock-${mod_version}-${project.minecraft_version}-forge-${project.forge_version}.jar"
+    from {
+        project.configurations.shade.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    finalizedBy 'reobfJar'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+tasks.register('testClient') {
+    group = 'Raith'
+    description = 'Launches the Forge client run configuration.'
+    dependsOn 'runClient'
 }
 
 tasks.register('buildNewRelease', Copy) {
@@ -160,338 +163,10 @@ tasks.register('buildNewRelease', Copy) {
     into file("E:/PiShock Mod Builds/${minecraft_version}")
 }
 
-tasks.register('buildNewReleaseNoBump', Copy) {
-    group = 'Raith'
-    description = 'Builds a release jar without bumping mod_version and copies it into E:\\PiShock Mod Builds\\<minecraft version>.'
-    dependsOn tasks.named('build')
-
-    from tasks.named('jar').flatMap { it.archiveFile }
-    into file("E:/PiShock Mod Builds/${minecraft_version}")
-}
-
-tasks.register('publishCurseForgeRelease', Exec) {
-    group = 'Raith'
-    description = 'Builds the mod and publishes the jar to CurseForge. Requires CURSEFORGE_TOKEN or ~/.gradle/gradle.properties curseforge_token.'
-    dependsOn tasks.named('buildNewRelease')
-
-    def gradleCommand = System.getProperty('os.name').toLowerCase().contains('windows') ? file('gradlew.bat') : file('gradlew')
-    def publishArgs = ['curseforge1520971', '-PskipVersionBump', '--no-configuration-cache', '--console=plain']
-    if (project.hasProperty('curseforgeDebug')) {
-        publishArgs.add('-PcurseforgeDebug')
-    }
-    commandLine([gradleCommand] + publishArgs)
-    environment 'CURSEFORGE_TOKEN', curseForgeToken.get()
-
-    doFirst {
-        if (curseForgeToken.get().isBlank()) {
-            throw new GradleException('Missing CurseForge token. Set CURSEFORGE_TOKEN or curseforge_token in ~/.gradle/gradle.properties.')
-        }
-    }
-}
-
-tasks.register('testClient') {
-    group = 'Raith'
-    description = 'Launches the NeoForge client run configuration.'
-    dependsOn 'runClient'
-}
-
-def minecraftVersionsTaskGroup = 'Raith Minecraft Versions'
-def minecraftVersions = ['1.21.1', '1.21.10', '1.21.11']
-
-def readMinecraftVersionProperties = { String mcVersion ->
-    def propsFile = file("src/mc-${mcVersion}/gradle.properties")
-    if (!propsFile.exists()) {
-        throw new GradleException("Missing Minecraft version properties: ${propsFile}")
-    }
-
-    def props = new Properties()
-    propsFile.withInputStream { props.load(it) }
-    props
-}
-
-def updateMinecraftVersionProperties = { String mcVersion ->
-    def props = readMinecraftVersionProperties(mcVersion)
-    def lines = modPropertiesFile.readLines('UTF-8')
-
-    props.each { key, value ->
-        def found = false
-        lines = lines.collect { line ->
-            if (line ==~ /^${java.util.regex.Pattern.quote(key as String)}=.*/) {
-                found = true
-                return "${key}=${value}"
-            }
-            line
-        }
-        if (!found) {
-            lines.add("${key}=${value}")
-        }
-    }
-
-    modPropertiesFile.setText(lines.join(System.lineSeparator()) + System.lineSeparator(), 'UTF-8')
-    logger.lifecycle("Using Minecraft ${mcVersion} / NeoForge ${props.neo_version} / Cloth Config ${props.cloth_config_version}")
-}
-
-def gradleWrapperCommand = {
-    System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
-            ? file('gradlew.bat').absolutePath
-            : file('gradlew').absolutePath
-}
-
-def registerMinecraftToolTask = { String taskName, String mcVersion, String scriptTask ->
-    tasks.register(taskName, Exec) {
-        group = minecraftVersionsTaskGroup
-        description = "${scriptTask.capitalize()}s PiShock for Minecraft ${mcVersion}."
-        workingDir projectDir
-        notCompatibleWithConfigurationCache('Switches Minecraft properties before launching a nested Gradle build.')
-
-        doFirst {
-            updateMinecraftVersionProperties(mcVersion)
-            def gradleTask = scriptTask == 'release' ? 'buildNewRelease' : scriptTask
-            commandLine gradleWrapperCommand(), gradleTask
-        }
-    }
-}
-
-minecraftVersions.each { mcVersion ->
-    def suffix = mcVersion.replace('.', '_')
-
-    tasks.register("switchToMinecraft${suffix}") {
-        group = minecraftVersionsTaskGroup
-        description = "Switches the project to Minecraft ${mcVersion}."
-        notCompatibleWithConfigurationCache('Edits gradle.properties for the selected Minecraft version.')
-
-        doLast {
-            updateMinecraftVersionProperties(mcVersion)
-        }
-    }
-
-    registerMinecraftToolTask("testMinecraft${suffix}", mcVersion, 'test')
-    registerMinecraftToolTask("buildMinecraft${suffix}", mcVersion, 'build')
-
-    tasks.register("releaseMinecraft${suffix}", Exec) {
-        group = minecraftVersionsTaskGroup
-        description = "Builds a release jar for Minecraft ${mcVersion}."
-        workingDir projectDir
-        notCompatibleWithConfigurationCache('Switches Minecraft properties before launching a nested Gradle build.')
-
-        doFirst {
-            updateMinecraftVersionProperties(mcVersion)
-            commandLine gradleWrapperCommand(), 'buildNewRelease'
-        }
-    }
-}
-
-def registerAllMinecraftVersionsTask = { String taskName, String gradleTask, String taskDescription ->
-    tasks.register(taskName) {
-        group = minecraftVersionsTaskGroup
-        description = taskDescription
-        notCompatibleWithConfigurationCache('Runs nested Gradle builds for multiple Minecraft versions.')
-
-        doLast {
-            def originalProperties = modPropertiesFile.getText('UTF-8')
-            try {
-                minecraftVersions.each { mcVersion ->
-                    updateMinecraftVersionProperties(mcVersion)
-                    exec {
-                        workingDir projectDir
-                        commandLine gradleWrapperCommand(), gradleTask
-                    }
-                }
-            } finally {
-                modPropertiesFile.setText(originalProperties, 'UTF-8')
-            }
-        }
-    }
-}
-
-registerAllMinecraftVersionsTask(
-        'testAllMinecraftVersions',
-        'test',
-        'Runs tests for Minecraft 1.21.1, 1.21.10, and 1.21.11, then restores gradle.properties.'
-)
-
-registerAllMinecraftVersionsTask(
-        'buildAllMinecraftVersions',
-        'build',
-        'Builds Minecraft 1.21.1, 1.21.10, and 1.21.11, then restores gradle.properties.'
-)
-
-registerAllMinecraftVersionsTask(
-        'releaseAllMinecraftVersions',
-        'buildNewRelease',
-        'Builds release jars for Minecraft 1.21.1, 1.21.10, and 1.21.11, then restores gradle.properties.'
-)
-
-repositories {
-    mavenLocal()
-    maven { url = 'https://maven.shedaniel.me/' }
-}
-
-base {
-    archivesName = mod_id
-}
-
-tasks.withType(Jar).configureEach {
-    archiveFileName = "pishock-${activeModVersion}-${project.minecraft_version}-neoforge-${project.neo_version}.jar"
-}
-
-
-// Mojang ships Java 21 to end users starting in 1.20.5, so mods should target Java 21.
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
-
-neoForge {
-    // Specify the version of NeoForge to use.
-    version = project.neo_version
-
-    parchment {
-        mappingsVersion = project.parchment_mappings_version
-        minecraftVersion = project.parchment_minecraft_version
-    }
-
-    // This line is optional. Access Transformers are automatically detected
-    // accessTransformers = project.files('src/main/resources/META-INF/accesstransformer.cfg')
-
-    // Default run configurations.
-    // These can be tweaked, removed, or duplicated as needed.
-    runs {
-        client {
-            client()
-
-            // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        server {
-            server()
-            programArgument '--nogui'
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        // This run config launches GameTestServer and runs all registered gametests, then exits.
-        // By default, the server will crash when no gametests are provided.
-        // The gametest system is also enabled by default for other run configs under the /test command.
-        gameTestServer {
-            type = "gameTestServer"
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        data {
-            clientData()
-
-            // example of overriding the workingDirectory set in configureEach above, uncomment if you want to use it
-            // gameDirectory = project.file('run-data')
-
-            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
-            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
-        }
-
-        // applies to all the run configs above
-        configureEach {
-            // Recommended logging data for a userdev environment
-            // The markers can be added/remove as needed separated by commas.
-            // "SCAN": For mods scan.
-            // "REGISTRIES": For firing of registry events.
-            // "REGISTRYDUMP": For getting the contents of all registries.
-            systemProperty 'forge.logging.markers', 'REGISTRIES'
-
-            // Recommended logging level for the console
-            // You can set various levels here.
-            // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
-            logLevel = org.slf4j.event.Level.DEBUG
-        }
-    }
-
-    mods {
-        // define mod <-> source bindings
-        // these are used to tell the game which sources are for which mod
-        // multi mod projects should define one per mod
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
-        }
-    }
-}
-
-// Include resources generated by data generators.
-sourceSets.main.resources { srcDir 'src/generated/resources' }
-
-// Sets up a dependency configuration called 'localRuntime'.
-// This configuration should be used instead of 'runtimeOnly' to declare
-// a dependency that will be present for runtime testing but that is
-// "optional", meaning it will not be pulled by dependents of this mod.
-configurations {
-    runtimeClasspath.extendsFrom localRuntime
-}
-
-dependencies {
-    def jSerialCommDependency = "com.fazecast:jSerialComm:2.11.4"
-    implementation "me.shedaniel.cloth:cloth-config-neoforge:${cloth_config_version}"
-    implementation jSerialCommDependency
-    clientAdditionalRuntimeClasspath jSerialCommDependency
-    jarJar jSerialCommDependency
-    testImplementation "com.google.code.gson:gson:2.11.0"
-    testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
-    testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
-
-    // Example optional mod dependency with JEI
-    // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
-    // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
-    // compileOnly "mezz.jei:jei-${mc_version}-neoforge-api:${jei_version}"
-    // We add the full version to localRuntime, not runtimeOnly, so that we do not publish a dependency on it
-    // localRuntime "mezz.jei:jei-${mc_version}-neoforge:${jei_version}"
-
-    // Example mod dependency using a mod jar from ./libs with a flat dir repository
-    // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
-    // The group id is ignored when searching -- in this case, it is "blank"
-    // implementation "blank:coolmod-${mc_version}:${coolmod_version}"
-
-    // Example mod dependency using a file as dependency
-    // implementation files("libs/coolmod-${mc_version}-${coolmod_version}.jar")
-
-    // Example project dependency using a sister or child project:
-    // implementation project(":myproject")
-
-    // For more info:
-    // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
-    // http://www.gradle.org/docs/current/userguide/dependency_management.html
-}
-
-tasks.withType(Test).configureEach {
-    useJUnitPlatform()
-}
-
-// This block of code expands all declared replace properties in the specified resource targets.
-// A missing property will result in an error. Properties are expanded using ${} Groovy notation.
-var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
-    var replaceProperties = [
-            minecraft_version      : minecraft_version,
-            minecraft_version_range: minecraft_version_range,
-            neo_version            : neo_version,
-            neo_version_range      : neo_version_range,
-            loader_version_range   : loader_version_range,
-            mod_id                 : mod_id,
-            mod_name               : mod_name,
-            mod_license            : mod_license,
-            mod_version            : activeModVersion,
-            update_json_url        : update_json_url,
-            mod_authors            : mod_authors,
-            mod_description        : mod_description
-    ]
-    inputs.properties replaceProperties
-    expand replaceProperties
-    from "src/main/templates"
-    into "build/generated/sources/modMetadata"
-}
-// Include the output of "generateModMetadata" as an input directory for the build
-// this works with both building through Gradle and the IDE.
-sourceSets.main.resources.srcDir generateModMetadata
-// To avoid having to run "generateModMetadata" manually, make it run on every project reload
-neoForge.ideSyncTask generateModMetadata
-
-// Example configuration to allow publishing using the maven-publish plugin
 publishing {
     publications {
         register('mavenJava', MavenPublication) {
-            from components.java
+            artifact jar
         }
     }
     repositories {
@@ -501,44 +176,6 @@ publishing {
     }
 }
 
-curseforge {
-    apiKey = curseForgeToken.get()
-
-    options {
-        debug = project.hasProperty('curseforgeDebug')
-    }
-
-    project {
-        apiKey = curseForgeToken.get()
-        id = '1520971'
-        releaseType = 'release'
-        changelogType = 'markdown'
-        changelog = "PiShock ${activeModVersion}"
-        addGameVersion minecraft_version
-        addGameVersion 'NeoForge'
-        relations {
-            requiredDependency 'cloth-config'
-        }
-        mainArtifact(jar) {
-            displayName = "PiShock ${activeModVersion} for Minecraft ${minecraft_version}"
-        }
-    }
-}
-
-afterEvaluate {
-    tasks.named('curseforge').configure {
-        notCompatibleWithConfigurationCache('CurseGradle upload tasks are not configuration-cache compatible.')
-    }
-    tasks.named('curseforge1520971').configure {
-        notCompatibleWithConfigurationCache('CurseGradle upload tasks are not configuration-cache compatible.')
-    }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
-}
-
-// IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
 idea {
     module {
         downloadSources = true

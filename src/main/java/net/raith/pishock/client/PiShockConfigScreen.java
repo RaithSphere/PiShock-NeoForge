@@ -4,14 +4,13 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.minecraft.client.gui.GuiGraphics;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.gui.ConfigurationScreen;
-import net.raith.pishock.PiShock;
+import net.minecraft.network.chat.TextComponent;
 import net.raith.pishock.PiShockConfig;
 
 import java.net.URI;
@@ -40,10 +39,10 @@ public class PiShockConfigScreen extends Screen {
     private CycleButton<Boolean> triggerOnDeathButton;
 
     private Button fetchIdsButton;
-    private Component statusMessage = Component.literal("");
+    private Component statusMessage = new TextComponent("");
 
     public PiShockConfigScreen(Screen parent) {
-        super(Component.literal("PiShock Setup"));
+        super(new TextComponent("PiShock Setup"));
         this.parent = parent;
     }
 
@@ -54,70 +53,63 @@ public class PiShockConfigScreen extends Screen {
         int left = centerX - (fieldWidth / 2);
         int y = 36;
 
-        this.usernameField = new EditBox(this.font, left, y, fieldWidth, 20, Component.literal("Username"));
+        this.usernameField = new EditBox(this.font, left, y, fieldWidth, 20, new TextComponent("Username"));
         this.usernameField.setValue(PiShockConfig.PISHOCK_USERNAME.get());
         this.addRenderableWidget(this.usernameField);
 
         y += 24;
-        this.apiKeyField = new EditBox(this.font, left, y, fieldWidth, 20, Component.literal("API Key"));
+        this.apiKeyField = new EditBox(this.font, left, y, fieldWidth, 20, new TextComponent("API Key"));
         this.apiKeyField.setValue(PiShockConfig.PISHOCK_APIKEY.get());
         this.addRenderableWidget(this.apiKeyField);
 
         y += 24;
-        this.userIdField = new EditBox(this.font, left, y, fieldWidth, 20, Component.literal("User ID"));
+        this.userIdField = new EditBox(this.font, left, y, fieldWidth, 20, new TextComponent("User ID"));
         this.userIdField.setValue(Integer.toString(PiShockConfig.PISHOCK_USER_ID.get()));
         this.addRenderableWidget(this.userIdField);
 
         y += 24;
-        this.hubIdField = new EditBox(this.font, left, y, fieldWidth, 20, Component.literal("Hub ID"));
+        this.hubIdField = new EditBox(this.font, left, y, fieldWidth, 20, new TextComponent("Hub ID"));
         this.hubIdField.setValue(Integer.toString(PiShockConfig.PISHOCK_HUB_ID.get()));
         this.addRenderableWidget(this.hubIdField);
 
         y += 24;
-        this.shockerIdField = new EditBox(this.font, left, y, fieldWidth, 20, Component.literal("Shocker ID"));
+        this.shockerIdField = new EditBox(this.font, left, y, fieldWidth, 20, new TextComponent("Shocker ID"));
         this.shockerIdField.setValue(PiShockConfig.PISHOCK_SHOCKER_ID.get());
         this.addRenderableWidget(this.shockerIdField);
 
         y += 24;
-        this.logIdentifierField = new EditBox(this.font, left, y, fieldWidth, 20, Component.literal("Log Identifier"));
+        this.logIdentifierField = new EditBox(this.font, left, y, fieldWidth, 20, new TextComponent("Log Identifier"));
         this.logIdentifierField.setValue(PiShockConfig.PISHOCK_LOG_IDENTIFIER.get());
         this.addRenderableWidget(this.logIdentifierField);
 
         y += 24;
-        this.durationField = new EditBox(this.font, left, y, 126, 20, Component.literal("Duration (ms)"));
+        this.durationField = new EditBox(this.font, left, y, 126, 20, new TextComponent("Duration (ms)"));
         this.durationField.setValue(Integer.toString(PiShockConfig.PISHOCK_DURATION.get()));
         this.addRenderableWidget(this.durationField);
 
-        this.intensityField = new EditBox(this.font, left + 134, y, 126, 20, Component.literal("Max Intensity"));
+        this.intensityField = new EditBox(this.font, left + 134, y, 126, 20, new TextComponent("Max Intensity"));
         this.intensityField.setValue(Integer.toString(PiShockConfig.PISHOCK_INTENSITY.get()));
         this.addRenderableWidget(this.intensityField);
 
         y += 28;
         this.triggerOnDeathButton = CycleButton.onOffBuilder(PiShockConfig.PISHOCK_TRIGGER_ON_DEATH.get())
-                .create(left, y, fieldWidth, 20, Component.literal("Trigger On Death"));
+                .create(left, y, fieldWidth, 20, new TextComponent("Trigger On Death"));
         this.addRenderableWidget(this.triggerOnDeathButton);
 
         y += 28;
-        this.fetchIdsButton = Button.builder(Component.literal("Fetch IDs"), btn -> fetchIds())
-                .bounds(left, y, 126, 20)
-                .build();
+        this.fetchIdsButton = new Button(left, y, 126, 20, new TextComponent("Fetch IDs"), btn -> fetchIds());
         this.addRenderableWidget(this.fetchIdsButton);
 
-        this.addRenderableWidget(Button.builder(Component.literal("Advanced Config"), btn -> {
+        this.addRenderableWidget(new Button(left + 134, y, 126, 20, new TextComponent("Advanced Config"), btn -> {
                     if (this.minecraft != null) {
-                        this.minecraft.setScreen(new ConfigurationScreen(PiShock.getModContainer(), this));
+                        this.minecraft.setScreen(PiShockClothConfigScreen.create(this));
                     }
-                }).bounds(left + 134, y, 126, 20)
-                .build());
+                }));
 
         y += 28;
-        this.addRenderableWidget(Button.builder(Component.literal("Save"), btn -> saveAndClose())
-                .bounds(left, y, 126, 20)
-                .build());
+        this.addRenderableWidget(new Button(left, y, 126, 20, new TextComponent("Save"), btn -> saveAndClose()));
 
-        this.addRenderableWidget(Button.builder(Component.literal("Cancel"), btn -> onClose())
-                .bounds(left + 134, y, 126, 20)
-                .build());
+        this.addRenderableWidget(new Button(left + 134, y, 126, 20, new TextComponent("Cancel"), btn -> onClose()));
     }
 
     private void fetchIds() {
@@ -125,12 +117,12 @@ public class PiShockConfigScreen extends Screen {
         String apiKey = this.apiKeyField.getValue().trim();
 
         if (username.isEmpty() || apiKey.isEmpty()) {
-            this.statusMessage = Component.literal("Enter Username and API Key first.");
+            this.statusMessage = new TextComponent("Enter Username and API Key first.");
             return;
         }
 
         this.fetchIdsButton.active = false;
-        this.statusMessage = Component.literal("Fetching IDs from PiShock API...");
+        this.statusMessage = new TextComponent("Fetching IDs from PiShock API...");
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -148,11 +140,11 @@ public class PiShockConfigScreen extends Screen {
                         }
 
                         if (userId != null && routing != null) {
-                            this.statusMessage = Component.literal("Fetched UserId/HubId/ShockerId successfully.");
+                            this.statusMessage = new TextComponent("Fetched UserId/HubId/ShockerId successfully.");
                         } else if (userId != null) {
-                            this.statusMessage = Component.literal("Fetched UserId, but no valid shocker routing found.");
+                            this.statusMessage = new TextComponent("Fetched UserId, but no valid shocker routing found.");
                         } else {
-                            this.statusMessage = Component.literal("Could not fetch IDs. Check API key/account access.");
+                            this.statusMessage = new TextComponent("Could not fetch IDs. Check API key/account access.");
                         }
                         this.fetchIdsButton.active = true;
                     });
@@ -160,7 +152,7 @@ public class PiShockConfigScreen extends Screen {
             } catch (Exception ex) {
                 if (this.minecraft != null) {
                     this.minecraft.execute(() -> {
-                        this.statusMessage = Component.literal("Fetch failed: " + ex.getMessage());
+                        this.statusMessage = new TextComponent("Fetch failed: " + ex.getMessage());
                         this.fetchIdsButton.active = true;
                     });
                 }
@@ -269,23 +261,24 @@ public class PiShockConfigScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
+    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        this.renderBackground(poseStack);
+        super.render(poseStack, mouseX, mouseY, partialTick);
 
         int centerX = this.width / 2;
         int left = centerX - 130;
 
-        guiGraphics.drawCenteredString(this.font, this.title, centerX, 12, 0xFFFFFF);
+        drawCenteredString(poseStack, this.font, this.title, centerX, 12, 0xFFFFFF);
 
-        guiGraphics.drawString(this.font, "Username", left, 28, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, "API Key", left, 52, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, "User ID", left, 76, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, "Hub ID", left, 100, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, "Shocker ID", left, 124, 0xA0A0A0, false);
-        guiGraphics.drawString(this.font, "Log Identifier", left, 148, 0xA0A0A0, false);
+        this.font.draw(poseStack, "Username", left, 28, 0xA0A0A0);
+        this.font.draw(poseStack, "API Key", left, 52, 0xA0A0A0);
+        this.font.draw(poseStack, "User ID", left, 76, 0xA0A0A0);
+        this.font.draw(poseStack, "Hub ID", left, 100, 0xA0A0A0);
+        this.font.draw(poseStack, "Shocker ID", left, 124, 0xA0A0A0);
+        this.font.draw(poseStack, "Log Identifier", left, 148, 0xA0A0A0);
 
         if (!this.statusMessage.getString().isEmpty()) {
-            guiGraphics.drawCenteredString(this.font, this.statusMessage, centerX, this.height - 24, 0xFFD37F);
+            drawCenteredString(poseStack, this.font, this.statusMessage, centerX, this.height - 24, 0xFFD37F);
         }
     }
 

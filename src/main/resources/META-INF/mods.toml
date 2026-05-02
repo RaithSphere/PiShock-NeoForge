@@ -1,0 +1,43 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+updateJSONURL="${update_json_url}"
+displayURL="https://www.curseforge.com/minecraft/mc-mods/pishock"
+logoFile="logo.png"
+authors="${mod_authors}"
+description='''PiShock integration for Minecraft.
+
+This client-side Forge mod connects Minecraft damage events to PiShock devices for adult players who want higher-stakes gameplay. It supports Shock, Vibrate, and Beep modes; configurable intensity and millisecond duration; damage scaling; death triggers; queued and combined damage events; broker error reporting; and in-game setup tools for fetching and validating PiShock account and shocker IDs.
+
+The mod works in multiplayer, including non-modded servers, and includes a quick enable/disable hotkey, config screens, and optional debug/status chat output.
+
+---
+
+Disclaimer: The authors of this mod are not responsible for any harm caused by the misuse of the shock collar sold with the PiShock device. We do not recommend placing any electrical device near the heart or using it if you have a heart condition. Shock collars are not intended for use on humans and can cause serious injuries, including cardiac events.
+'''
+
+[[dependencies.${mod_id}]]
+    modId="forge"
+    mandatory=true
+    versionRange="${forge_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="cloth_config"
+    mandatory=true
+    versionRange="[6.4.90,)"
+    ordering="NONE"
+    side="CLIENT"

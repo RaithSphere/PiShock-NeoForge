@@ -2,6 +2,7 @@ package net.raith.pishock;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextComponent;
 
 import javax.annotation.Nonnull;
 
@@ -13,7 +14,7 @@ public class Utils {
     }
 
     public static void sendToMinecraftChat(@Nonnull final String message) {
-        sendToMinecraftChat(Component.literal(message));
+        sendToMinecraftChat(new TextComponent(message));
     }
 
     public static void sendToMinecraftChat(@Nonnull final Component message) {

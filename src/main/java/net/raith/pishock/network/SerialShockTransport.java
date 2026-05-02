@@ -27,8 +27,18 @@ final class SerialShockTransport {
     }
 
     static boolean send(String configuredPortName, int baudRate, int shockerId, PiShock.PiShockMode mode, int intensity, int durationMs) {
-        JsonObject command = buildOperateCommand(shockerId, mode, intensity, durationMs);
-        return sendCommand(configuredPortName, baudRate, command.toString());
+        if (!isSerialLibraryAvailable()) {
+            PiShock.LOGGER.warn("jSerialComm is not available; serial operation cannot be sent.");
+            return false;
+        }
+
+        try {
+            JsonObject command = buildOperateCommand(shockerId, mode, intensity, durationMs);
+            return sendCommand(configuredPortName, baudRate, command.toString());
+        } catch (LinkageError | RuntimeException error) {
+            PiShock.LOGGER.warn("Serial operation failed before dispatch: {}", error.getMessage());
+            return false;
+        }
     }
 
     static boolean check(String configuredPortName, int baudRate) {
@@ -36,26 +46,55 @@ final class SerialShockTransport {
     }
 
     static Info info(String configuredPortName, int baudRate) {
-        JsonObject command = buildInfoCommand();
-        String response = queryCommand(configuredPortName, baudRate, command.toString());
-        if (response == null || response.isBlank()) {
+        if (!isSerialLibraryAvailable()) {
+            PiShock.LOGGER.warn("jSerialComm is not available; serial info cannot be queried.");
             return null;
         }
-        return parseInfo(response);
+
+        try {
+            JsonObject command = buildInfoCommand();
+            String response = queryCommand(configuredPortName, baudRate, command.toString());
+            if (response == null || response.isBlank()) {
+                return null;
+            }
+            return parseInfo(response);
+        } catch (LinkageError | RuntimeException error) {
+            PiShock.LOGGER.warn("Serial info query failed: {}", error.getMessage());
+            return null;
+        }
     }
 
     static List<PortInfo> listPorts() {
-        List<PortInfo> ports = new ArrayList<>();
-        for (SerialPort port : SerialPort.getCommPorts()) {
-            ports.add(new PortInfo(
-                    port.getSystemPortName(),
-                    port.getDescriptivePortName(),
-                    port.getVendorID(),
-                    port.getProductID(),
-                    isPiShockPort(port)
-            ));
+        if (!isSerialLibraryAvailable()) {
+            PiShock.LOGGER.warn("jSerialComm is not available; serial port list will be empty.");
+            return List.of();
         }
-        return ports;
+
+        try {
+            List<PortInfo> ports = new ArrayList<>();
+            for (SerialPort port : SerialPort.getCommPorts()) {
+                ports.add(new PortInfo(
+                        port.getSystemPortName(),
+                        port.getDescriptivePortName(),
+                        port.getVendorID(),
+                        port.getProductID(),
+                        isPiShockPort(port)
+                ));
+            }
+            return ports;
+        } catch (LinkageError | RuntimeException error) {
+            PiShock.LOGGER.warn("Serial port enumeration failed: {}", error.getMessage());
+            return List.of();
+        }
+    }
+
+    private static boolean isSerialLibraryAvailable() {
+        try {
+            SerialPort.class.getName();
+            return true;
+        } catch (LinkageError error) {
+            return false;
+        }
     }
 
     private static JsonObject buildInfoCommand() {

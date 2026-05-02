@@ -5,27 +5,25 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.commands.Commands;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.VersionChecker;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
-import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
-import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
-import net.neoforged.neoforge.client.event.ScreenEvent;
-import net.neoforged.neoforge.common.NeoForge;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.ClientRegistry;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.client.event.RegisterClientCommandsEvent;
+import net.minecraftforge.client.event.ScreenEvent;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.VersionChecker;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.raith.pishock.client.PiShockClothConfigScreen;
 import net.raith.pishock.client.PiShockCompat;
 import net.raith.pishock.network.ShockCore;
@@ -42,10 +40,9 @@ public class PiShock {
 
     public static final String MOD_ID = "pishock";
     public static final Logger LOGGER = LogUtils.getLogger();
-    // Minecraft and NeoForge moved a few client APIs between 1.21.x releases.
+    // Minecraft moved a few client APIs between releases.
     // PiShockCompat keeps those details out of the common mod code.
     private static final KeyMapping TOGGLE_KEY = PiShockCompat.createToggleKey();
-    private static ModContainer MOD_CONTAINER;
 
     @Nullable
     private static Float previousHP = null;
@@ -57,24 +54,23 @@ public class PiShock {
     private static long pendingDamageLastEventAtMs = -1L;
     private static final AtomicLong SHOCK_VISUAL_UNTIL_MS = new AtomicLong(0L);
 
-    public PiShock(IEventBus modEventBus, ModContainer modContainer) {
-        MOD_CONTAINER = modContainer;
+    public PiShock() {
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         modEventBus.addListener(this::commonSetup);
-        modEventBus.addListener(ClientModEvents::onRegisterKeyMappings);
+        modEventBus.addListener(ClientModEvents::onClientSetup);
 
         // Register only once; onHurt uses @SubscribeEvent.
-        NeoForge.EVENT_BUS.register(this);
+        MinecraftForge.EVENT_BUS.register(this);
 
-        modContainer.registerConfig(ModConfig.Type.COMMON, PiShockConfig.SPEC);
-        modContainer.registerExtensionPoint(IConfigScreenFactory.class, (minecraft, parent) -> PiShockClothConfigScreen.create(parent));
-    }
-
-    public static ModContainer getModContainer() {
-        return MOD_CONTAINER;
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, PiShockConfig.SPEC);
     }
 
     @SubscribeEvent
-    public void onHurt(PlayerTickEvent.Post event) {
+    public void onHurt(TickEvent.PlayerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+
         final Player player = Minecraft.getInstance().player;
 
         if (player == null) {
@@ -256,7 +252,7 @@ public class PiShock {
         Utils.unilog("PiShock initialized");
     }
 
-    @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
+    @Mod.EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
     public static class ClientModEvents {
         private static final int UPDATE_CHECK_MAX_TICKS = 600;
         private static final int UPDATE_CHECK_RETRY_TICKS = 20;
@@ -264,13 +260,8 @@ public class PiShock {
         private static int updateCheckTicksRemaining = 0;
         private static int updateCheckRetryTicks = 0;
 
-        public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
-            event.register(TOGGLE_KEY);
-        }
-
-        @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
-            // No-op for now.
+            event.enqueueWork(() -> ClientRegistry.registerKeyBinding(TOGGLE_KEY));
         }
 
         @SubscribeEvent
@@ -294,7 +285,11 @@ public class PiShock {
         }
 
         @SubscribeEvent
-        public static void onClientTick(ClientTickEvent.Post event) {
+        public static void onClientTick(TickEvent.ClientTickEvent event) {
+            if (event.phase != TickEvent.Phase.END) {
+                return;
+            }
+
             while (TOGGLE_KEY.consumeClick()) {
                 boolean enabled = !PiShockConfig.PISHOCK_ENABLED.get();
                 PiShockConfig.PISHOCK_ENABLED.set(enabled);
@@ -308,7 +303,7 @@ public class PiShock {
         }
 
         @SubscribeEvent
-        public static void onClientPlayerLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
+        public static void onClientPlayerLoggingIn(ClientPlayerNetworkEvent.LoggedInEvent event) {
             if (updateNotificationDone) {
                 return;
             }
@@ -329,7 +324,14 @@ public class PiShock {
                 return;
             }
 
-            VersionChecker.CheckResult result = VersionChecker.getResult(PiShock.getModContainer().getModInfo());
+            VersionChecker.CheckResult result = ModList.get()
+                    .getModContainerById(MOD_ID)
+                    .map(container -> VersionChecker.getResult(container.getModInfo()))
+                    .orElse(null);
+            if (result == null) {
+                updateNotificationDone = true;
+                return;
+            }
             switch (result.status()) {
                 case OUTDATED, BETA_OUTDATED -> {
                     Utils.sendToMinecraftChat("[PiShock] Update available: " + result.target()
@@ -342,12 +344,12 @@ public class PiShock {
         }
 
         @SubscribeEvent
-        public static void onScreenInit(ScreenEvent.Init.Post event) {
+        public static void onScreenInit(ScreenEvent.InitScreenEvent.Post event) {
             PiShockCompat.onScreenInit(event);
         }
 
         @SubscribeEvent
-        public static void onScreenRender(ScreenEvent.Render.Post event) {
+        public static void onScreenRender(ScreenEvent.DrawScreenEvent.Post event) {
             PiShockClothConfigScreen.onScreenRender(event);
         }
     }

@@ -1,95 +1,95 @@
 package net.raith.pishock;
 
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.event.config.ModConfigEvent;
-import net.neoforged.neoforge.common.ModConfigSpec;
+import net.minecraftforge.common.ForgeConfigSpec;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
+import net.minecraftforge.fml.event.config.ModConfigEvent;
 
 @EventBusSubscriber(modid = PiShock.MOD_ID)
 public class PiShockConfig {
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
+    private static final ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
 
-    public static final ModConfigSpec.ConfigValue<PiShock.PiShockMode> PISHOCK_MODE = BUILDER
+    public static final ForgeConfigSpec.ConfigValue<PiShock.PiShockMode> PISHOCK_MODE = BUILDER
             .comment("PiShock mode", "SHOCK is the intended mode for this mod")
             .defineEnum("PiShock_Mode", PiShock.PiShockMode.Shock);
 
-    public static final ModConfigSpec.ConfigValue<PiShock.PiShockTransport> PISHOCK_TRANSPORT = BUILDER
+    public static final ForgeConfigSpec.ConfigValue<PiShock.PiShockTransport> PISHOCK_TRANSPORT = BUILDER
             .comment("How to send PiShock operations", "WebSocket uses the broker API. Serial uses a locally attached PiShock V3 hub over USB.")
             .defineEnum("PiShock_Transport", PiShock.PiShockTransport.WebSocket);
 
-    public static final ModConfigSpec.ConfigValue<String> PISHOCK_SERIAL_PORT = BUILDER
+    public static final ForgeConfigSpec.ConfigValue<String> PISHOCK_SERIAL_PORT = BUILDER
             .comment("Serial port for local PiShock V3 hub", "Leave blank to auto-detect VID 0x1A86 with PID 0x7523 or 0x55D4.")
             .define("PiShock_SerialPort", "");
 
-    public static final ModConfigSpec.IntValue PISHOCK_SERIAL_BAUD = BUILDER
+    public static final ForgeConfigSpec.IntValue PISHOCK_SERIAL_BAUD = BUILDER
             .comment("Serial baud rate for local PiShock V3 hub", "Official PiShock serial API uses 115200 baud.")
             .defineInRange("PiShock_SerialBaud", 115200, 1200, 921600);
 
-    public static final ModConfigSpec.BooleanValue PISHOCK_ENABLED = BUILDER
+    public static final ForgeConfigSpec.BooleanValue PISHOCK_ENABLED = BUILDER
             .comment("Master enable switch for API calls")
             .define("PiShock_Enabled", false);
 
-    public static final ModConfigSpec.ConfigValue<String> PISHOCK_USERNAME = BUILDER
+    public static final ForgeConfigSpec.ConfigValue<String> PISHOCK_USERNAME = BUILDER
             .comment("PiShock username", "Required for websocket broker auth")
             .define("PiShock_Username", "");
 
-    public static final ModConfigSpec.ConfigValue<String> PISHOCK_SHOCKER_ID = BUILDER
+    public static final ForgeConfigSpec.ConfigValue<String> PISHOCK_SHOCKER_ID = BUILDER
             .comment("ShockerId to operate", "Optional: auto-discovered from /Shockers when blank")
             .define("PiShock_ShockerId", "");
 
-    public static final ModConfigSpec.IntValue PISHOCK_HUB_ID = BUILDER
+    public static final ForgeConfigSpec.IntValue PISHOCK_HUB_ID = BUILDER
             .comment("HubId used to build websocket target channel", "Optional: auto-discovered from /Shockers when -1")
             .defineInRange("PiShock_HubId", -1, -1, Integer.MAX_VALUE);
 
-    public static final ModConfigSpec.IntValue PISHOCK_USER_ID = BUILDER
+    public static final ForgeConfigSpec.IntValue PISHOCK_USER_ID = BUILDER
             .comment("Your PiShock user ID", "Optional: auto-discovered from /Account when -1")
             .defineInRange("PiShock_UserId", -1, -1, Integer.MAX_VALUE);
 
-    public static final ModConfigSpec.ConfigValue<String> PISHOCK_LOG_IDENTIFIER = BUILDER
+    public static final ForgeConfigSpec.ConfigValue<String> PISHOCK_LOG_IDENTIFIER = BUILDER
             .comment("Log identifier shown in PiShock logs")
             .define("PiShock_LogIdentifier", "Minecraft");
 
-    public static final ModConfigSpec.BooleanValue PISHOCK_SHOW_SUCCESS_CONFIRMATION = BUILDER
+    public static final ForgeConfigSpec.BooleanValue PISHOCK_SHOW_SUCCESS_CONFIRMATION = BUILDER
             .comment("Show in-game chat confirmation when a shock command is acknowledged by the broker")
             .define("PiShock_ShowSuccessConfirmation", false);
 
-    public static final ModConfigSpec.BooleanValue PISHOCK_DEBUG = BUILDER
+    public static final ForgeConfigSpec.BooleanValue PISHOCK_DEBUG = BUILDER
             .comment("Enable verbose PiShock debug logging")
             .define("PiShock_Debug", false);
 
-    public static final ModConfigSpec.BooleanValue PISHOCK_TRIGGER_ON_DEATH = BUILDER
+    public static final ForgeConfigSpec.BooleanValue PISHOCK_TRIGGER_ON_DEATH = BUILDER
             .comment("Trigger on death")
             .define("PiShock_TriggerOnDeath", true);
 
-    public static final ModConfigSpec.ConfigValue<String> PISHOCK_APIKEY = BUILDER
+    public static final ForgeConfigSpec.ConfigValue<String> PISHOCK_APIKEY = BUILDER
             .comment("PiShock API key", "Used for websocket auth and discovery REST calls")
             .define("PiShock_API", "");
 
-    public static final ModConfigSpec.IntValue PISHOCK_DURATION = BUILDER
+    public static final ForgeConfigSpec.IntValue PISHOCK_DURATION = BUILDER
             .comment("Shock duration in milliseconds", "Valid range: 100 to 15000")
             .defineInRange("PiShock_Duration", 1000, 100, 15000);
 
-    public static final ModConfigSpec.BooleanValue PISHOCK_COMBINE_DAMAGE_EVENTS = BUILDER
+    public static final ForgeConfigSpec.BooleanValue PISHOCK_COMBINE_DAMAGE_EVENTS = BUILDER
             .comment("Combine rapid damage events into one queued shock")
             .define("PiShock_CombineDamageEvents", true);
 
-    public static final ModConfigSpec.IntValue PISHOCK_COMBINE_WINDOW_MS = BUILDER
+    public static final ForgeConfigSpec.IntValue PISHOCK_COMBINE_WINDOW_MS = BUILDER
             .comment("Milliseconds to wait for more damage before combining")
             .defineInRange("PiShock_CombineWindowMs", 250, 0, 5000);
 
-    public static final ModConfigSpec.BooleanValue PISHOCK_QUEUE_ENABLED = BUILDER
+    public static final ForgeConfigSpec.BooleanValue PISHOCK_QUEUE_ENABLED = BUILDER
             .comment("Queue shocks and send them sequentially")
             .define("PiShock_QueueEnabled", true);
 
-    public static final ModConfigSpec.IntValue PISHOCK_QUEUE_MAX_SIZE = BUILDER
+    public static final ForgeConfigSpec.IntValue PISHOCK_QUEUE_MAX_SIZE = BUILDER
             .comment("Maximum queued shock entries")
             .defineInRange("PiShock_QueueMaxSize", 32, 1, 512);
 
-    public static final ModConfigSpec.IntValue PISHOCK_INTENSITY = BUILDER
+    public static final ForgeConfigSpec.IntValue PISHOCK_INTENSITY = BUILDER
             .comment("Maximum intensity", "Intensity of the punishment. Must be an integer from 1 to 100.")
             .defineInRange("PiShock_DeathIntensity", 80, 1, 100);
 
-    static final ModConfigSpec SPEC = BUILDER.build();
+    static final ForgeConfigSpec SPEC = BUILDER.build();
 
     public static void save() {
         SPEC.save();
@@ -97,6 +97,6 @@ public class PiShockConfig {
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
-        // Intentionally empty; NeoForge loads values into static config holders.
+        // Intentionally empty; Forge loads values into static config holders.
     }
 }

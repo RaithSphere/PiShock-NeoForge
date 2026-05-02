@@ -12,14 +12,16 @@ import me.shedaniel.clothconfig2.gui.entries.SelectionListEntry;
 import me.shedaniel.clothconfig2.gui.entries.StringListListEntry;
 import me.shedaniel.clothconfig2.gui.entries.StringListEntry;
 import me.shedaniel.clothconfig2.gui.entries.TextListEntry;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraftforge.client.event.ScreenEvent;
 import net.raith.pishock.PiShock;
 import net.raith.pishock.PiShockConfig;
 import net.raith.pishock.Utils;
@@ -58,54 +60,55 @@ public final class PiShockClothConfigScreen {
     }
 
     private static Screen create(Screen parent, boolean openApiFirst, boolean openSerialFirst) {
+        String initialShockerId = PiShockConfig.PISHOCK_SHOCKER_ID.get();
         ConfigBuilder builder = ConfigBuilder.create()
                 .setParentScreen(parent)
-                .setTitle(Component.literal("PiShock Setup"));
+                .setTitle(new TextComponent("PiShock Setup"));
 
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
         ConfigCategory behavior;
         ConfigCategory api;
         ConfigCategory serial;
         if (openApiFirst) {
-            behavior = builder.getOrCreateCategory(Component.literal("Behavior"));
-            api = builder.getOrCreateCategory(Component.literal("API"));
-            serial = builder.getOrCreateCategory(Component.literal("Serial"));
+            behavior = builder.getOrCreateCategory(new TextComponent("Behavior"));
+            api = builder.getOrCreateCategory(new TextComponent("API"));
+            serial = builder.getOrCreateCategory(new TextComponent("Serial"));
         } else {
-            behavior = builder.getOrCreateCategory(Component.literal("Behavior"));
-            api = builder.getOrCreateCategory(Component.literal("API"));
-            serial = builder.getOrCreateCategory(Component.literal("Serial"));
+            behavior = builder.getOrCreateCategory(new TextComponent("Behavior"));
+            api = builder.getOrCreateCategory(new TextComponent("API"));
+            serial = builder.getOrCreateCategory(new TextComponent("Serial"));
         }
-        api.addEntry(entryBuilder.startTextDescription(Component.literal(
+        api.addEntry(entryBuilder.startTextDescription(new TextComponent(
                         "Click Fetch IDs to populate User ID, Hub ID, and Shocker ID from your PiShock account."))
                 .build());
 
-        StringListEntry usernameEntry = entryBuilder.startStrField(Component.literal("Username"), PiShockConfig.PISHOCK_USERNAME.get())
+        StringListEntry usernameEntry = entryBuilder.startStrField(new TextComponent("Username"), PiShockConfig.PISHOCK_USERNAME.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_USERNAME::set)
                 .build();
         api.addEntry(usernameEntry);
 
-        StringListEntry apiKeyEntry = entryBuilder.startStrField(Component.literal("API Key"), PiShockConfig.PISHOCK_APIKEY.get())
+        StringListEntry apiKeyEntry = entryBuilder.startStrField(new TextComponent("API Key"), PiShockConfig.PISHOCK_APIKEY.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_APIKEY::set)
                 .build();
         api.addEntry(apiKeyEntry);
 
-        StringListEntry userIdEntry = entryBuilder.startStrField(Component.literal("User ID (-1 = Auto)"), Integer.toString(PiShockConfig.PISHOCK_USER_ID.get()))
+        StringListEntry userIdEntry = entryBuilder.startStrField(new TextComponent("User ID (-1 = Auto)"), Integer.toString(PiShockConfig.PISHOCK_USER_ID.get()))
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_USER_ID.set(parseIntOrDefault(value, -1)))
                 .build();
         api.addEntry(userIdEntry);
 
-        StringListEntry hubIdEntry = entryBuilder.startStrField(Component.literal("Hub ID (-1 = Auto)"), Integer.toString(PiShockConfig.PISHOCK_HUB_ID.get()))
+        StringListEntry hubIdEntry = entryBuilder.startStrField(new TextComponent("Hub ID (-1 = Auto)"), Integer.toString(PiShockConfig.PISHOCK_HUB_ID.get()))
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_HUB_ID.set(parseIntOrDefault(value, -1)))
                 .build();
         api.addEntry(hubIdEntry);
 
-        StringListEntry shockerIdEntry = entryBuilder.startStrField(Component.literal("Shocker ID (blank = Auto)"), PiShockConfig.PISHOCK_SHOCKER_ID.get())
+        StringListEntry shockerIdEntry = entryBuilder.startStrField(new TextComponent("Shocker ID (blank = Auto)"), initialShockerId)
                 .setSaveConsumer(PiShockConfig.PISHOCK_SHOCKER_ID::set)
                 .build();
         api.addEntry(shockerIdEntry);
 
         StringListListEntry hubShockerListEntry = entryBuilder
-                .startStrList(Component.literal("Hub -> Shockers"), toHubShockerDisplayList(CACHED_DEVICE_ROUTES))
+                .startStrList(new TextComponent("Hub -> Shockers"), toHubShockerDisplayList(CACHED_DEVICE_ROUTES))
                 .setSaveConsumer(value -> {
                     // Display list only; selection is done through Hub ID + Shocker ID fields.
                 })
@@ -113,57 +116,57 @@ public final class PiShockClothConfigScreen {
                 .build();
         api.addEntry(hubShockerListEntry);
 
-        api.addEntry(entryBuilder.startStrField(Component.literal("Log Identifier"), PiShockConfig.PISHOCK_LOG_IDENTIFIER.get())
+        api.addEntry(entryBuilder.startStrField(new TextComponent("Log Identifier"), PiShockConfig.PISHOCK_LOG_IDENTIFIER.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_LOG_IDENTIFIER::set)
                 .build());
-        behavior.addEntry(entryBuilder.startBooleanToggle(Component.literal("Enabled"), PiShockConfig.PISHOCK_ENABLED.get())
+        behavior.addEntry(entryBuilder.startBooleanToggle(new TextComponent("Enabled"), PiShockConfig.PISHOCK_ENABLED.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_ENABLED::set)
                 .build());
-        behavior.addEntry(entryBuilder.startEnumSelector(Component.literal("Mode"), PiShock.PiShockMode.class, PiShockConfig.PISHOCK_MODE.get())
+        behavior.addEntry(entryBuilder.startEnumSelector(new TextComponent("Mode"), PiShock.PiShockMode.class, PiShockConfig.PISHOCK_MODE.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_MODE::set)
                 .build());
-        behavior.addEntry(entryBuilder.startEnumSelector(Component.literal("Transport"), PiShock.PiShockTransport.class, PiShockConfig.PISHOCK_TRANSPORT.get())
+        behavior.addEntry(entryBuilder.startEnumSelector(new TextComponent("Transport"), PiShock.PiShockTransport.class, PiShockConfig.PISHOCK_TRANSPORT.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_TRANSPORT::set)
                 .build());
-        behavior.addEntry(entryBuilder.startBooleanToggle(Component.literal("Trigger On Death"), PiShockConfig.PISHOCK_TRIGGER_ON_DEATH.get())
+        behavior.addEntry(entryBuilder.startBooleanToggle(new TextComponent("Trigger On Death"), PiShockConfig.PISHOCK_TRIGGER_ON_DEATH.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_TRIGGER_ON_DEATH::set)
                 .build());
-        behavior.addEntry(entryBuilder.startBooleanToggle(Component.literal("Show Success Confirmation"), PiShockConfig.PISHOCK_SHOW_SUCCESS_CONFIRMATION.get())
+        behavior.addEntry(entryBuilder.startBooleanToggle(new TextComponent("Show Success Confirmation"), PiShockConfig.PISHOCK_SHOW_SUCCESS_CONFIRMATION.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_SHOW_SUCCESS_CONFIRMATION::set)
                 .build());
-        behavior.addEntry(entryBuilder.startBooleanToggle(Component.literal("Debug Logging"), PiShockConfig.PISHOCK_DEBUG.get())
+        behavior.addEntry(entryBuilder.startBooleanToggle(new TextComponent("Debug Logging"), PiShockConfig.PISHOCK_DEBUG.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_DEBUG::set)
                 .build());
-        behavior.addEntry(entryBuilder.startIntField(Component.literal("Duration (ms)"), PiShockConfig.PISHOCK_DURATION.get())
+        behavior.addEntry(entryBuilder.startIntField(new TextComponent("Duration (ms)"), PiShockConfig.PISHOCK_DURATION.get())
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_DURATION.set(clamp(value, 100, 15000)))
                 .build());
-        behavior.addEntry(entryBuilder.startIntField(Component.literal("Max Intensity"), PiShockConfig.PISHOCK_INTENSITY.get())
+        behavior.addEntry(entryBuilder.startIntField(new TextComponent("Max Intensity"), PiShockConfig.PISHOCK_INTENSITY.get())
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_INTENSITY.set(clamp(value, 1, 100)))
                 .build());
-        behavior.addEntry(entryBuilder.startBooleanToggle(Component.literal("Combine Rapid Damage"), PiShockConfig.PISHOCK_COMBINE_DAMAGE_EVENTS.get())
+        behavior.addEntry(entryBuilder.startBooleanToggle(new TextComponent("Combine Rapid Damage"), PiShockConfig.PISHOCK_COMBINE_DAMAGE_EVENTS.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_COMBINE_DAMAGE_EVENTS::set)
                 .build());
-        behavior.addEntry(entryBuilder.startIntField(Component.literal("Combine Window (ms)"), PiShockConfig.PISHOCK_COMBINE_WINDOW_MS.get())
+        behavior.addEntry(entryBuilder.startIntField(new TextComponent("Combine Window (ms)"), PiShockConfig.PISHOCK_COMBINE_WINDOW_MS.get())
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_COMBINE_WINDOW_MS.set(clamp(value, 0, 5000)))
                 .build());
-        behavior.addEntry(entryBuilder.startBooleanToggle(Component.literal("Queue Shocks"), PiShockConfig.PISHOCK_QUEUE_ENABLED.get())
+        behavior.addEntry(entryBuilder.startBooleanToggle(new TextComponent("Queue Shocks"), PiShockConfig.PISHOCK_QUEUE_ENABLED.get())
                 .setSaveConsumer(PiShockConfig.PISHOCK_QUEUE_ENABLED::set)
                 .build());
-        behavior.addEntry(entryBuilder.startIntField(Component.literal("Queue Max Size"), PiShockConfig.PISHOCK_QUEUE_MAX_SIZE.get())
+        behavior.addEntry(entryBuilder.startIntField(new TextComponent("Queue Max Size"), PiShockConfig.PISHOCK_QUEUE_MAX_SIZE.get())
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_QUEUE_MAX_SIZE.set(clamp(value, 1, 512)))
                 .build());
 
-        serial.addEntry(entryBuilder.startTextDescription(Component.translatable("pishock.configuration.serial.description"))
+        serial.addEntry(entryBuilder.startTextDescription(new TranslatableComponent("pishock.configuration.serial.description"))
                 .build());
         String[] serialPortOptions = serialPortOptions();
-        SelectionListEntry<String> serialPortEntry = entryBuilder.startSelector(Component.translatable("pishock.configuration.serial.port"), serialPortOptions, selectedSerialPort(serialPortOptions))
+        SelectionListEntry<String> serialPortEntry = entryBuilder.startSelector(new TranslatableComponent("pishock.configuration.serial.port"), serialPortOptions, selectedSerialPort(serialPortOptions))
                 .setNameProvider(PiShockClothConfigScreen::serialPortLabel)
                 .setSaveConsumer(PiShockClothConfigScreen::setSerialPort)
                 .build();
-        IntegerListEntry serialBaudEntry = entryBuilder.startIntField(Component.translatable("pishock.configuration.serial.baud"), PiShockConfig.PISHOCK_SERIAL_BAUD.get())
+        IntegerListEntry serialBaudEntry = entryBuilder.startIntField(new TranslatableComponent("pishock.configuration.serial.baud"), PiShockConfig.PISHOCK_SERIAL_BAUD.get())
                 .setSaveConsumer(value -> PiShockConfig.PISHOCK_SERIAL_BAUD.set(clamp(value, 1200, 921600)))
                 .build();
-        StringListEntry serialShockerIdEntry = entryBuilder.startStrField(Component.translatable("pishock.configuration.serial.shocker_id"), PiShockConfig.PISHOCK_SHOCKER_ID.get())
+        StringListEntry serialShockerIdEntry = entryBuilder.startStrField(new TranslatableComponent("pishock.configuration.serial.shocker_id"), initialShockerId)
                 .setSaveConsumer(PiShockConfig.PISHOCK_SHOCKER_ID::set)
                 .build();
         SerialContext serialContext = new SerialContext(parent, usernameEntry, apiKeyEntry, userIdEntry, hubIdEntry, shockerIdEntry, serialShockerIdEntry, serialPortEntry, serialBaudEntry);
@@ -185,11 +188,34 @@ public final class PiShockClothConfigScreen {
             }
         });
 
-        builder.setSavingRunnable(PiShockConfig::save);
+        builder.setSavingRunnable(() -> {
+            PiShockConfig.PISHOCK_SHOCKER_ID.set(resolveShockerIdValue(
+                    initialShockerId,
+                    shockerIdEntry.getValue(),
+                    serialShockerIdEntry.getValue()
+            ));
+            PiShockConfig.save();
+        });
         return builder.build();
     }
 
-    public static void onScreenInit(ScreenEvent.Init.Post event) {
+    private static String resolveShockerIdValue(String initialValue, String apiValue, String serialValue) {
+        String initial = trimConfigString(initialValue);
+        String api = trimConfigString(apiValue);
+        String serial = trimConfigString(serialValue);
+        boolean apiChanged = !api.equals(initial);
+        boolean serialChanged = !serial.equals(initial);
+
+        if (apiChanged && !serialChanged) {
+            return api;
+        }
+        if (serialChanged) {
+            return serial;
+        }
+        return api;
+    }
+
+    public static void onScreenInit(ScreenEvent.InitScreenEvent.Post event) {
         FetchContext context;
         synchronized (FETCH_CONTEXTS) {
             context = FETCH_CONTEXTS.get(event.getScreen());
@@ -205,23 +231,17 @@ public final class PiShockClothConfigScreen {
         int x = event.getScreen().width - Math.max(fetchWidth, (smallWidth * 2) + gap) - 8;
         int y = 8;
 
-        Button fetchButton = Button.builder(Component.literal("Fetch IDs"), button -> fetchIds(button, context))
-                .bounds(x, y, fetchWidth, buttonHeight)
-                .build();
+        Button fetchButton = new Button(x, y, fetchWidth, buttonHeight, new TextComponent("Fetch IDs"), button -> fetchIds(button, context));
         event.addListener(fetchButton);
 
-        Button checkButton = Button.builder(Component.literal("Check"), PiShockClothConfigScreen::runConnectivityCheck)
-                .bounds(x, y + buttonHeight + 4, smallWidth, buttonHeight)
-                .build();
+        Button checkButton = new Button(x, y + buttonHeight + 4, smallWidth, buttonHeight, new TextComponent("Check"), PiShockClothConfigScreen::runConnectivityCheck);
         event.addListener(checkButton);
 
-        Button testVibrationButton = Button.builder(Component.literal("Test"), PiShockClothConfigScreen::runVibrationTest)
-                .bounds(x + smallWidth + gap, y + buttonHeight + 4, smallWidth, buttonHeight)
-                .build();
+        Button testVibrationButton = new Button(x + smallWidth + gap, y + buttonHeight + 4, smallWidth, buttonHeight, new TextComponent("Test"), PiShockClothConfigScreen::runVibrationTest);
         event.addListener(testVibrationButton);
     }
 
-    public static void onScreenRender(ScreenEvent.Render.Post event) {
+    public static void onScreenRender(ScreenEvent.DrawScreenEvent.Post event) {
     }
 
     private static void fetchIds(Button button, FetchContext context) {
@@ -230,12 +250,12 @@ public final class PiShockClothConfigScreen {
         logFetch("Fetch IDs pressed. usernameSet=" + !username.isEmpty() + ", apiKeySet=" + !apiKey.isEmpty());
 
         if (username.isEmpty() || apiKey.isEmpty()) {
-            button.setMessage(Component.literal("Need creds"));
+            button.setMessage(new TextComponent("Need creds"));
             return;
         }
 
         button.active = false;
-        button.setMessage(Component.literal("Fetching..."));
+        button.setMessage(new TextComponent("Fetching..."));
 
         CompletableFuture.supplyAsync(() -> lookupIds(username, apiKey))
                 .whenComplete((result, throwable) -> {
@@ -249,7 +269,7 @@ public final class PiShockClothConfigScreen {
                             } else {
                                 logFetch("Fetch IDs completed but returned no result.");
                             }
-                            button.setMessage(Component.literal("Fetch failed"));
+                            button.setMessage(new TextComponent("Fetch failed"));
                             return;
                         }
 
@@ -274,7 +294,7 @@ public final class PiShockClothConfigScreen {
                         }
 
                         PiShockConfig.save();
-                        button.setMessage(Component.literal("Fetched"));
+                        button.setMessage(new TextComponent("Fetched"));
                         minecraft.setScreen(create(context.parentScreen, true));
                     });
                 });
@@ -295,36 +315,36 @@ public final class PiShockClothConfigScreen {
 
     private static void runConnectivityCheck(Button button) {
         button.active = false;
-        button.setMessage(Component.literal("..."));
+        button.setMessage(new TextComponent("..."));
         ShockHandler.checkConnectivityAsync().whenComplete((message, throwable) -> {
             Minecraft minecraft = Minecraft.getInstance();
             minecraft.execute(() -> {
                 button.active = true;
                 if (throwable != null) {
-                    button.setMessage(Component.literal("Fail"));
+                    button.setMessage(new TextComponent("Fail"));
                     return;
                 }
 
                 boolean ok = message != null && (message.contains("Connectivity OK") || message.contains("Serial check OK"));
-                button.setMessage(Component.literal(ok ? "OK" : "Issue"));
+                button.setMessage(new TextComponent(ok ? "OK" : "Issue"));
             });
         });
     }
 
     private static void runVibrationTest(Button button) {
         button.active = false;
-        button.setMessage(Component.literal("..."));
+        button.setMessage(new TextComponent("..."));
         ShockHandler.sendVibrationTestAsync().whenComplete((message, throwable) -> {
             Minecraft minecraft = Minecraft.getInstance();
             minecraft.execute(() -> {
                 button.active = true;
                 if (throwable != null) {
-                    button.setMessage(Component.literal("Fail"));
+                    button.setMessage(new TextComponent("Fail"));
                     return;
                 }
 
                 boolean ok = message != null && message.contains("sent");
-                button.setMessage(Component.literal(ok ? "Sent" : "Fail"));
+                button.setMessage(new TextComponent(ok ? "Sent" : "Fail"));
             });
         });
     }
@@ -332,13 +352,13 @@ public final class PiShockClothConfigScreen {
     private static void runSerialConnect(Button button, SerialContext context) {
         applySerialConfig(context);
         button.active = false;
-        button.setMessage(Component.literal("..."));
+        button.setMessage(new TextComponent("..."));
         ShockHandler.fetchSerialInfoAsync().whenComplete((result, throwable) -> {
             Minecraft minecraft = Minecraft.getInstance();
             minecraft.execute(() -> {
                 button.active = true;
                 if (throwable != null || result == null || !result.success()) {
-                    button.setMessage(Component.literal("Fail"));
+                    button.setMessage(new TextComponent("Fail"));
                     Utils.sendToMinecraftChat("[PiShock] Serial connect failed.");
                     return;
                 }
@@ -355,7 +375,7 @@ public final class PiShockClothConfigScreen {
                 PiShockConfig.save();
                 SERIAL_DISPLAY = SerialDisplay.from(result);
 
-                button.setMessage(Component.literal("Found"));
+                button.setMessage(new TextComponent("Found"));
                 Utils.sendToMinecraftChat(result.message());
             });
         });
@@ -363,7 +383,7 @@ public final class PiShockClothConfigScreen {
 
     private static void saveSerialConfig(Button button, SerialContext context) {
         applySerialConfig(context);
-        button.setMessage(Component.literal("Saved"));
+        button.setMessage(new TextComponent("Saved"));
         Utils.sendToMinecraftChat("[PiShock] Serial settings saved.");
     }
 
@@ -575,6 +595,10 @@ public final class PiShockClothConfigScreen {
         }
     }
 
+    private static String trimConfigString(String value) {
+        return value == null ? "" : value.trim();
+    }
+
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
@@ -632,8 +656,8 @@ public final class PiShockClothConfigScreen {
 
     private static Component serialPortLabel(String port) {
         return port == null || port.isBlank()
-                ? Component.translatable("pishock.configuration.serial.auto_detect")
-                : Component.literal(port);
+                ? new TranslatableComponent("pishock.configuration.serial.auto_detect")
+                : new TextComponent(port);
     }
 
     private static void logFetch(String message) {
@@ -704,20 +728,20 @@ public final class PiShockClothConfigScreen {
         private final Supplier<String> valueSupplier;
 
         private RightAlignedInfoEntry(String translationKey, Supplier<String> valueSupplier) {
-            super(Component.translatable(translationKey), Component.empty());
-            this.label = Component.translatable(translationKey);
+            super(new TranslatableComponent(translationKey), TextComponent.EMPTY);
+            this.label = new TranslatableComponent(translationKey);
             this.valueSupplier = valueSupplier;
         }
 
         @Override
-        public void render(GuiGraphics graphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float delta) {
+        public void render(PoseStack poseStack, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float delta) {
             var font = Minecraft.getInstance().font;
             int textY = y + (entryHeight - font.lineHeight) / 2;
-            graphics.drawString(font, label, x + TEXT_PADDING, textY, getPreferredTextColor());
+            font.draw(poseStack, label, x + TEXT_PADDING, textY, getPreferredTextColor());
             String rawValue = valueSupplier.get();
-            Component value = Component.literal(rawValue == null || rawValue.isBlank() ? "-" : rawValue);
+            Component value = new TextComponent(rawValue == null || rawValue.isBlank() ? "-" : rawValue);
             int valueWidth = font.width(value);
-            graphics.drawString(font, value, x + entryWidth - valueWidth - TEXT_PADDING, textY, getPreferredTextColor());
+            font.draw(poseStack, value, x + entryWidth - valueWidth - TEXT_PADDING, textY, getPreferredTextColor());
         }
     }
 
@@ -727,33 +751,29 @@ public final class PiShockClothConfigScreen {
         private static final int BUTTON_HEIGHT = 20;
         private static final int BUTTON_GAP = 4;
         private static final int ENTRY_HEIGHT = 28;
-        private final Component label = Component.translatable("pishock.configuration.serial.connection");
+        private final Component label = new TranslatableComponent("pishock.configuration.serial.connection");
         private final Button queryButton;
         private final Button saveButton;
 
         private SerialControlsEntry(Consumer<Button> onQuery, Consumer<Button> onSave) {
-            super(Component.translatable("pishock.configuration.serial.connection"), Component.empty());
-            this.queryButton = Button.builder(Component.translatable("pishock.configuration.serial.query"), onQuery::accept)
-                    .bounds(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
-                    .build();
-            this.saveButton = Button.builder(Component.translatable("pishock.configuration.serial.save"), onSave::accept)
-                    .bounds(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
-                    .build();
+            super(new TranslatableComponent("pishock.configuration.serial.connection"), TextComponent.EMPTY);
+            this.queryButton = new Button(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("pishock.configuration.serial.query"), onQuery::accept);
+            this.saveButton = new Button(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT, new TranslatableComponent("pishock.configuration.serial.save"), onSave::accept);
         }
 
         @Override
-        public void render(GuiGraphics graphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float delta) {
+        public void render(PoseStack poseStack, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float delta) {
             var font = Minecraft.getInstance().font;
             int textY = y + (entryHeight - font.lineHeight) / 2;
-            graphics.drawString(font, label, x + TEXT_PADDING, textY, getPreferredTextColor());
+            font.draw(poseStack, label, x + TEXT_PADDING, textY, getPreferredTextColor());
             int buttonsWidth = (BUTTON_WIDTH * 2) + BUTTON_GAP;
             int buttonY = y + (entryHeight - BUTTON_HEIGHT) / 2;
-            queryButton.setX(x + entryWidth - buttonsWidth - TEXT_PADDING);
-            queryButton.setY(buttonY);
-            saveButton.setX(x + entryWidth - BUTTON_WIDTH - TEXT_PADDING);
-            saveButton.setY(buttonY);
-            queryButton.render(graphics, mouseX, mouseY, delta);
-            saveButton.render(graphics, mouseX, mouseY, delta);
+            queryButton.x = x + entryWidth - buttonsWidth - TEXT_PADDING;
+            queryButton.y = buttonY;
+            saveButton.x = x + entryWidth - BUTTON_WIDTH - TEXT_PADDING;
+            saveButton.y = buttonY;
+            queryButton.render(poseStack, mouseX, mouseY, delta);
+            saveButton.render(poseStack, mouseX, mouseY, delta);
         }
 
         @Override

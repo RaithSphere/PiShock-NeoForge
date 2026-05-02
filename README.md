@@ -1,6 +1,6 @@
-# PiShock NeoForge Mod
+# PiShock Forge Mod
 
-![](https://img.shields.io/badge/Enviroment-Client-purple?style=for-the-badge) ![](https://img.shields.io/badge/Loader-NeoForge-a8320c?style=for-the-badge) ![Build and unit tests](https://img.shields.io/github/actions/workflow/status/RaithSphere/PiShock-NeoForge/build.yml?branch=main&label=Build%20%26%20Unit%20Tests&style=for-the-badge)
+![](https://img.shields.io/badge/Enviroment-Client-purple?style=for-the-badge) ![](https://img.shields.io/badge/Loader-Forge-a8320c?style=for-the-badge) ![Build and unit tests](https://img.shields.io/github/actions/workflow/status/RaithSphere/PiShock-NeoForge/build.yml?branch=main&label=Build%20%26%20Unit%20Tests&style=for-the-badge)
 
 Not intended for users below the age of 18.
 
@@ -41,9 +41,9 @@ This project carries personal risk and was developed as a masochistic gameplay m
 - Confirm your PiShock API key was generated on or after `2024-10-15` (required by websocket API login).
 
 ## Requirements
-- A supported Minecraft 1.21.x version
-- NeoForge
-- Cloth Config (NeoForge build)
+- Minecraft 1.18.2
+- Forge 40.3.12 or newer for Minecraft 1.18.2
+- Cloth Config (Forge build)
 
 ## Setup
 - Launch Minecraft and open **PiShock Setup** from the main menu icon.
